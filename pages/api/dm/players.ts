@@ -1,18 +1,16 @@
+import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseAdmin } from '../../../lib/supabase'
 import { getUserFromHeader } from '../../../lib/auth'
 
-export const runtime = 'edge'
-
-export default async function handler(req: Request) {
-  const user = await getUserFromHeader(req.headers.get('authorization'))
-  if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const user = await getUserFromHeader(req.headers.authorization || null)
+  if (!user) return res.status(401).json({ error: 'Unauthorized' })
 
   const db = getSupabaseAdmin()
-  const url = new URL(req.url)
 
   if (req.method === 'GET') {
-    const worldId = url.searchParams.get('worldId')
-    if (!worldId) return new Response(JSON.stringify({ error: 'worldId required' }), { status: 400 })
+    const worldId = req.query.worldId as string
+    if (!worldId) return res.status(400).json({ error: 'worldId required' })
 
     const { data: players } = await db
       .from('players')
@@ -21,7 +19,6 @@ export default async function handler(req: Request) {
       .eq('dm_id', user.id)
       .order('created_at', { ascending: true })
 
-    // Get message counts
     const playerIds = (players || []).map(p => p.id)
     const messageCounts: Record<string, number> = {}
     if (playerIds.length > 0) {
@@ -35,30 +32,30 @@ export default async function handler(req: Request) {
       }
     }
 
-    return new Response(JSON.stringify({
+    return res.json({
       players: (players || []).map(p => ({ ...p, messageCount: messageCounts[p.id] || 0 }))
-    }), { headers: { 'Content-Type': 'application/json' } })
+    })
   }
 
   if (req.method === 'POST') {
-    const { worldId, name, email } = await req.json()
+    const { worldId, name, email } = req.body
     const { data: world } = await db
       .from('worlds').select('id').eq('id', worldId).eq('dm_id', user.id).single()
-    if (!world) return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 })
+    if (!world) return res.status(403).json({ error: 'Forbidden' })
 
     const { data: player, error } = await db
       .from('players')
       .insert({ world_id: worldId, dm_id: user.id, name, email: email || null })
       .select().single()
-    if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500 })
-    return new Response(JSON.stringify({ player }), { headers: { 'Content-Type': 'application/json' } })
+    if (error) return res.status(500).json({ error: error.message })
+    return res.json({ player })
   }
 
   if (req.method === 'DELETE') {
-    const { playerId } = await req.json()
+    const { playerId } = req.body
     await db.from('players').delete().eq('id', playerId).eq('dm_id', user.id)
-    return new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json' } })
+    return res.json({ success: true })
   }
 
-  return new Response('Method not allowed', { status: 405 })
+  return res.status(405).end()
 }
