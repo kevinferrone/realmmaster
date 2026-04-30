@@ -116,4 +116,5 @@ Respond with ONLY valid JSON:
     }
   }
 
-  return res.json({ success: true, summarized: true, summary, newKnowled
+  return res.json({ success: true, summarized: true, summary, newKnowledgeCount: newKnowledge.length })
+}
