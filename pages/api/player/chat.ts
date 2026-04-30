@@ -39,9 +39,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     { role: 'user' as const, content: message }
   ]
 
-  console.log('Calling Anthropic...')
-  console.log('API key prefix:', process.env.ANTHROPIC_API_KEY?.slice(0, 15))
-
   const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -58,4 +55,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   })
 
   const responseText = await anthropicRes.text()
-  console.log('Anthropic
+
+  if (!anthropicRes.ok) {
+    return res.status(500).json({ 
+      error: 'Anthropic API error', 
+      status: anthropicRes.status,
+      details: responseText
+    })
+  }
+
+  const data = JSON.parse(responseText)
+  const reply = data.content?.[0]?.text || ''
+
+  await db.from('messages').insert({
+    player_id: player.id,
+    world_id: world.id,
+    session_id: currentSessionId,
+    role: 'assistant',
+    content: reply
+  })
+
+  return res.json({ reply, sessionId: currentSessionId })
+}
