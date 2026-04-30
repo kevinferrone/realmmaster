@@ -1,27 +1,24 @@
+import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseAdmin } from '../../../lib/supabase'
 import { getUserFromHeader } from '../../../lib/auth'
 
-export const runtime = 'edge'
-
-export default async function handler(req: Request) {
-  const user = await getUserFromHeader(req.headers.get('authorization'))
-  if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const user = await getUserFromHeader(req.headers.authorization || null)
+  if (!user) return res.status(401).json({ error: 'Unauthorized' })
 
   const db = getSupabaseAdmin()
-  const url = new URL(req.url)
 
-  // GET: fetch all knowledge + sessions for a player
   if (req.method === 'GET') {
-    const playerId = url.searchParams.get('playerId')
-    if (!playerId) return new Response(JSON.stringify({ error: 'playerId required' }), { status: 400 })
+    const playerId = req.query.playerId as string
+    if (!playerId) return res.status(400).json({ error: 'playerId required' })
 
-    // Verify DM owns this player
     const { data: player } = await db
       .from('players').select('world_id').eq('id', playerId).single()
-    if (!player) return new Response(JSON.stringify({ error: 'Not found' }), { status: 404 })
+    if (!player) return res.status(404).json({ error: 'Not found' })
+
     const { data: world } = await db
       .from('worlds').select('id').eq('id', player.world_id).eq('dm_id', user.id).single()
-    if (!world) return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 })
+    if (!world) return res.status(403).json({ error: 'Forbidden' })
 
     const [{ data: knowledge }, { data: sessions }] = await Promise.all([
       db.from('character_knowledge')
@@ -34,21 +31,19 @@ export default async function handler(req: Request) {
         .order('started_at', { ascending: false })
     ])
 
-    return new Response(JSON.stringify({ knowledge: knowledge || [], sessions: sessions || [] }), {
-      headers: { 'Content-Type': 'application/json' }
-    })
+    return res.json({ knowledge: knowledge || [], sessions: sessions || [] })
   }
 
-  // POST: DM grants new knowledge to a character
   if (req.method === 'POST') {
-    const { playerId, category, title, content } = await req.json()
+    const { playerId, category, title, content } = req.body
 
     const { data: player } = await db
       .from('players').select('world_id').eq('id', playerId).single()
-    if (!player) return new Response(JSON.stringify({ error: 'Not found' }), { status: 404 })
+    if (!player) return res.status(404).json({ error: 'Not found' })
+
     const { data: world } = await db
       .from('worlds').select('id').eq('id', player.world_id).eq('dm_id', user.id).single()
-    if (!world) return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 })
+    if (!world) return res.status(403).json({ error: 'Forbidden' })
 
     const { data: entry, error } = await db.from('character_knowledge').insert({
       player_id: playerId,
@@ -59,30 +54,26 @@ export default async function handler(req: Request) {
       source: 'dm_granted'
     }).select().single()
 
-    if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500 })
-    return new Response(JSON.stringify({ entry }), { headers: { 'Content-Type': 'application/json' } })
+    if (error) return res.status(500).json({ error: error.message })
+    return res.json({ entry })
   }
 
-  // PATCH: edit a knowledge entry or toggle active
   if (req.method === 'PATCH') {
-    const { entryId, title, content, category, is_active } = await req.json()
-
+    const { entryId, title, content, category, is_active } = req.body
     const updates: any = {}
     if (title !== undefined) updates.title = title
     if (content !== undefined) updates.content = content
     if (category !== undefined) updates.category = category
     if (is_active !== undefined) updates.is_active = is_active
-
     await db.from('character_knowledge').update(updates).eq('id', entryId)
-    return new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json' } })
+    return res.json({ success: true })
   }
 
-  // DELETE: remove a knowledge entry
   if (req.method === 'DELETE') {
-    const { entryId } = await req.json()
+    const { entryId } = req.body
     await db.from('character_knowledge').delete().eq('id', entryId)
-    return new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json' } })
+    return res.json({ success: true })
   }
 
-  return new Response('Method not allowed', { status: 405 })
+  return res.status(405).end()
 }
