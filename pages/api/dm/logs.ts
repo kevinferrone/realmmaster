@@ -1,25 +1,23 @@
+import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseAdmin } from '../../../lib/supabase'
 import { getUserFromHeader } from '../../../lib/auth'
 
-export const runtime = 'edge'
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'GET') return res.status(405).end()
 
-export default async function handler(req: Request) {
-  if (req.method !== 'GET') return new Response('Method not allowed', { status: 405 })
-
-  const user = await getUserFromHeader(req.headers.get('authorization'))
-  if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
+  const user = await getUserFromHeader(req.headers.authorization || null)
+  if (!user) return res.status(401).json({ error: 'Unauthorized' })
 
   const db = getSupabaseAdmin()
-  const url = new URL(req.url)
-  const worldId = url.searchParams.get('worldId')
-  const playerId = url.searchParams.get('playerId')
-  const limit = parseInt(url.searchParams.get('limit') || '100')
+  const worldId = req.query.worldId as string
+  const playerId = req.query.playerId as string
+  const limit = parseInt(req.query.limit as string || '100')
 
-  if (!worldId) return new Response(JSON.stringify({ error: 'worldId required' }), { status: 400 })
+  if (!worldId) return res.status(400).json({ error: 'worldId required' })
 
   const { data: world } = await db
     .from('worlds').select('id').eq('id', worldId).eq('dm_id', user.id).single()
-  if (!world) return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 })
+  if (!world) return res.status(403).json({ error: 'Forbidden' })
 
   let query = db
     .from('messages')
@@ -31,7 +29,5 @@ export default async function handler(req: Request) {
   if (playerId) query = query.eq('player_id', playerId)
 
   const { data: messages } = await query
-  return new Response(JSON.stringify({ messages: messages || [] }), {
-    headers: { 'Content-Type': 'application/json' }
-  })
+  return res.json({ messages: messages || [] })
 }
