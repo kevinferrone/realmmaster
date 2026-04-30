@@ -1,28 +1,26 @@
-import { getSupabase } from '../../../lib/supabase'
+import type { NextApiRequest, NextApiResponse } from 'next'
+import { createClient } from '@supabase/supabase-js'
 
-export const runtime = 'edge'
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') return res.status(405).end()
 
-export default async function handler(req: Request) {
-  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 })
-
-  const { action, email, password } = await req.json()
-  const supabase = getSupabase()
-
-  if (action === 'signup') {
-    const { data, error } = await supabase.auth.signUp({ email, password })
-    if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400 })
-    return new Response(JSON.stringify({ user: data.user, session: data.session }), {
-      headers: { 'Content-Type': 'application/json' }
-    })
-  }
+  const { action, email, password } = req.body
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 
   if (action === 'login') {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) return new Response(JSON.stringify({ error: error.message }), { status: 400 })
-    return new Response(JSON.stringify({ user: data.user, session: data.session }), {
-      headers: { 'Content-Type': 'application/json' }
-    })
+    if (error) return res.status(400).json({ error: error.message })
+    return res.json({ user: data.user, session: data.session })
   }
 
-  return new Response(JSON.stringify({ error: 'Invalid action' }), { status: 400 })
+  if (action === 'signup') {
+    const { data, error } = await supabase.auth.signUp({ email, password })
+    if (error) return res.status(400).json({ error: error.message })
+    return res.json({ user: data.user, session: data.session })
+  }
+
+  return res.status(400).json({ error: 'Invalid action' })
 }
