@@ -1,15 +1,12 @@
+import type { NextApiRequest, NextApiResponse } from 'next'
 import { getSupabaseAdmin } from '../../../lib/supabase'
 
-export const runtime = 'edge'
-
-export default async function handler(req: Request) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const db = getSupabaseAdmin()
-  const url = new URL(req.url)
 
-  // GET: load player info by token
   if (req.method === 'GET') {
-    const token = url.searchParams.get('token')
-    if (!token) return new Response(JSON.stringify({ error: 'token required' }), { status: 400 })
+    const token = req.query.token as string
+    if (!token) return res.status(400).json({ error: 'token required' })
 
     const { data: player } = await db
       .from('players')
@@ -17,7 +14,7 @@ export default async function handler(req: Request) {
       .eq('invite_token', token)
       .single()
 
-    if (!player) return new Response(JSON.stringify({ error: 'Invalid invite link' }), { status: 404 })
+    if (!player) return res.status(404).json({ error: 'Invalid invite link' })
 
     const { data: world } = await db
       .from('worlds')
@@ -25,18 +22,14 @@ export default async function handler(req: Request) {
       .eq('id', player.world_id)
       .single()
 
-    return new Response(JSON.stringify({ player, world }), {
-      headers: { 'Content-Type': 'application/json' }
-    })
+    return res.json({ player, world })
   }
 
-  // POST: save character sheet (JSON only — no file upload in edge runtime)
   if (req.method === 'POST') {
-    const body = await req.json()
     const { token, characterName, characterClass, characterBackground,
-            characterKnowledge, stats, sheetText } = body
+            characterKnowledge, stats, sheetText } = req.body
 
-    if (!token) return new Response(JSON.stringify({ error: 'token required' }), { status: 400 })
+    if (!token) return res.status(400).json({ error: 'token required' })
 
     const { data: player } = await db
       .from('players')
@@ -44,7 +37,7 @@ export default async function handler(req: Request) {
       .eq('invite_token', token)
       .single()
 
-    if (!player) return new Response(JSON.stringify({ error: 'Invalid token' }), { status: 404 })
+    if (!player) return res.status(404).json({ error: 'Invalid token' })
 
     await db.from('players').update({
       character_name: characterName,
@@ -55,9 +48,7 @@ export default async function handler(req: Request) {
       character_sheet_text: sheetText || ''
     }).eq('id', player.id)
 
-    // If starting knowledge provided, add to ledger
     if (characterKnowledge?.trim()) {
-      // Check if we already have a starting knowledge entry
       const { data: existing } = await db
         .from('character_knowledge')
         .select('id')
@@ -77,10 +68,8 @@ export default async function handler(req: Request) {
       }
     }
 
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { 'Content-Type': 'application/json' }
-    })
+    return res.json({ success: true })
   }
 
-  return new Response('Method not allowed', { status: 405 })
+  return res.status(405).end()
 }
