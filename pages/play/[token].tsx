@@ -157,4 +157,123 @@ export default function PlayerPortal() {
                     <textarea style={{ ...s.input, height: 120, resize: 'vertical' as any, fontFamily: 'monospace', fontSize: 12 }} value={sheetText} onChange={e => setSheetText(e.target.value)} placeholder="Paste character sheet contents here..." />
                   </div>
                   <div style={{ ...s.card, marginTop: 14 }}>
-                    <div style={s.cardTi
+                    <div style={s.cardTitle}>⚙ Stats</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      {Object.keys(stats).map(stat => (
+                        <input key={stat} style={{ ...s.input, margin: 0 }} value={stats[stat as keyof typeof stats]} onChange={e => setStats(p => ({ ...p, [stat]: e.target.value }))} placeholder={stat} />
+                      ))}
+                    </div>
+                  </div>
+                  {saveStatus && <p style={{ fontSize: 13, color: saveStatus.startsWith('✓') ? '#5aaa5a' : '#c04040', margin: '8px 0' }}>{saveStatus}</p>}
+                  <button style={{ ...s.btnPrimary, marginTop: 14, width: '100%' }} onClick={saveCharacter} disabled={saving}>
+                    {saving ? 'Saving...' : '⚡ Save & Enter the World'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {tab === 'chat' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+                <h1 style={s.title}>Speak with the World</h1>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {sessionId && !sessionEnded && (
+                    <button style={{ ...s.btnSm, borderColor: '#8b2020', color: '#c04040' }} onClick={endSession} disabled={sessionEnding}>
+                      {sessionEnding ? 'Saving...' : '📖 End & Summarize Session'}
+                    </button>
+                  )}
+                  {sessionEnded && <button style={s.btnSm} onClick={newSession}>▶ New Session</button>}
+                </div>
+              </div>
+              <p style={s.sub}>Answering as <em>{charName || 'an unnamed adventurer'}</em> — only what your character would know.</p>
+
+              <div style={s.chatWrap}>
+                <div style={s.chatHeader}>
+                  <div style={s.chatAvatar}>🎲</div>
+                  <div>
+                    <div style={{ fontSize: 14, color: '#e8b86d' }}>The Dungeon Master</div>
+                    <div style={{ fontSize: 12, color: '#7a6a50', fontStyle: 'italic' }}>
+                      {chatLoading ? 'Consulting the ancient lore...' : sessionEnded ? 'Session concluded' : 'Ready'}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={s.messages}>
+                  {messages.length === 0 && (
+                    <div style={{ ...s.msg }}>
+                      <div style={{ ...s.avatar, ...s.avatarDm }}>DM</div>
+                      <div style={{ ...s.bubble, ...s.bubbleDm }}>Welcome, adventurer. What would you know?</div>
+                    </div>
+                  )}
+                  {messages.map(m => (
+                    <div key={m.id} style={{ ...s.msg, ...(m.role === 'user' ? s.msgUser : {}) }}>
+                      <div style={{ ...s.avatar, ...(m.role === 'user' ? s.avatarUser : s.avatarDm) }}>
+                        {m.role === 'user' ? (charName?.slice(0, 2).toUpperCase() || 'ME') : 'DM'}
+                      </div>
+                      <div style={{ ...s.bubble, ...(m.role === 'user' ? s.bubbleUser : s.bubbleDm) }}>
+                        {m.content.split('\n').map((line, i) => <span key={i}>{line}{i < m.content.split('\n').length - 1 ? <br /> : ''}</span>)}
+                      </div>
+                    </div>
+                  ))}
+                  {chatLoading && (
+                    <div style={s.msg}>
+                      <div style={{ ...s.avatar, ...s.avatarDm }}>DM</div>
+                      <div style={{ ...s.bubble, ...s.bubbleDm, opacity: 0.5 }}>▌</div>
+                    </div>
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+
+                <div style={s.inputRow}>
+                  <textarea style={{ ...s.chatInput, opacity: sessionEnded ? 0.5 : 1 }} value={input}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
+                    placeholder={sessionEnded ? 'Start a new session to continue...' : 'Ask the DM a question as your character...'}
+                    disabled={chatLoading || sessionEnded} />
+                  <button style={{ ...s.sendBtn, opacity: chatLoading || sessionEnded ? 0.4 : 1 }} onClick={sendMessage} disabled={chatLoading || sessionEnded}>➤</button>
+                </div>
+              </div>
+              <p style={{ fontSize: 12, color: '#5a4a30', textAlign: 'center' as any, marginTop: 10, fontStyle: 'italic' }}>
+                Click "End & Summarize Session" when done to save your progress.
+              </p>
+            </div>
+          )}
+        </main>
+      </div>
+    </>
+  )
+}
+
+const s: Record<string, React.CSSProperties> = {
+  root: { background: '#0d0a07', minHeight: '100vh', color: '#e8dcc8', fontFamily: 'Georgia, serif' },
+  center: { background: '#0d0a07', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c9933a', fontSize: 18 },
+  nav: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 1.5rem', height: 60, borderBottom: '1px solid rgba(201,147,58,0.2)', background: 'rgba(13,10,7,0.95)', position: 'sticky', top: 0, zIndex: 100 },
+  logo: { fontSize: 20, fontWeight: 700, color: '#e8b86d' },
+  tab: { fontSize: 12, padding: '6px 14px', borderRadius: 6, border: '1px solid transparent', background: 'transparent', color: '#7a6a50', cursor: 'pointer' },
+  tabActive: { background: '#1a1206', color: '#e8b86d', border: '1px solid rgba(201,147,58,0.3)' },
+  main: { maxWidth: 960, margin: '0 auto', padding: '2rem 1.5rem' },
+  title: { fontSize: 26, fontWeight: 700, color: '#f5d49a', marginBottom: 4 },
+  sub: { fontSize: 15, color: '#7a6a50', fontStyle: 'italic', marginBottom: 24 },
+  grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 },
+  card: { background: '#1a1206', border: '1px solid rgba(201,147,58,0.18)', borderRadius: 10, padding: '1.25rem' },
+  cardTitle: { fontSize: 12, letterSpacing: '0.12em', color: '#e8b86d', marginBottom: 12, textTransform: 'uppercase' },
+  input: { width: '100%', background: '#0d0a07', border: '1px solid rgba(201,147,58,0.2)', borderRadius: 6, padding: '9px 12px', fontFamily: 'Georgia, serif', fontSize: 14, color: '#e8dcc8', outline: 'none', marginBottom: 10, boxSizing: 'border-box' },
+  btnPrimary: { background: '#c9933a', color: '#0d0a07', border: 'none', borderRadius: 6, padding: '11px 20px', fontFamily: 'Georgia, serif', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: '0.1em', textTransform: 'uppercase' },
+  btnSm: { background: 'transparent', color: '#c9933a', border: '1px solid rgba(201,147,58,0.35)', borderRadius: 5, padding: '5px 12px', fontFamily: 'Georgia, serif', fontSize: 11, cursor: 'pointer' },
+  chatWrap: { background: '#1a1206', border: '1px solid rgba(201,147,58,0.2)', borderRadius: 10, overflow: 'hidden', display: 'flex', flexDirection: 'column', height: 520 },
+  chatHeader: { display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: '1px solid rgba(201,147,58,0.12)', background: '#231a0a' },
+  chatAvatar: { width: 36, height: 36, borderRadius: '50%', background: '#4a0a0a', border: '1.5px solid #8b2020', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 },
+  messages: { flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 14 },
+  msg: { display: 'flex', gap: 10, alignItems: 'flex-start' },
+  msgUser: { flexDirection: 'row-reverse' },
+  avatar: { width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0, marginTop: 2 },
+  avatarDm: { background: '#4a0a0a', border: '1px solid #8b2020', color: '#ff9090' },
+  avatarUser: { background: 'rgba(201,147,58,0.15)', border: '1px solid rgba(201,147,58,0.3)', color: '#e8b86d' },
+  bubble: { maxWidth: '78%', padding: '10px 14px', borderRadius: 10, fontSize: 14, lineHeight: 1.7 },
+  bubbleDm: { background: '#231a0a', border: '1px solid rgba(201,147,58,0.1)', borderBottomLeftRadius: 2, color: '#e8dcc8' },
+  bubbleUser: { background: 'rgba(201,147,58,0.09)', border: '1px solid rgba(201,147,58,0.22)', borderBottomRightRadius: 2, color: '#e8dcc8' },
+  inputRow: { display: 'flex', gap: 8, padding: 12, borderTop: '1px solid rgba(201,147,58,0.12)', background: '#231a0a' },
+  chatInput: { flex: 1, background: '#0d0a07', border: '1px solid rgba(201,147,58,0.18)', borderRadius: 6, padding: '9px 12px', fontFamily: 'Georgia, serif', fontSize: 14, color: '#e8dcc8', outline: 'none', resize: 'none', height: 42 },
+  sendBtn: { width: 42, height: 42, borderRadius: 6, border: '1px solid rgba(201,147,58,0.35)', background: 'rgba(201,147,58,0.08)', color: '#c9933a', cursor: 'pointer', fontSize: 16, flexShrink: 0 },
+}
