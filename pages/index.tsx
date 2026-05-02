@@ -55,9 +55,8 @@ function AuthScreen() {
 
 export default function DMPortal() {
   const { session, loading } = useAuth()
-  const [tab, setTab] = useState<'world' | 'players' | 'knowledge' | 'logs'>('world')
+  const [tab, setTab] = useState<'world' | 'players' | 'parties' | 'knowledge' | 'logs'>('world')
 
-  // World state
   const [worlds, setWorlds] = useState<any[]>([])
   const [activeWorldId, setActiveWorldId] = useState<string | null>(null)
   const [worldName, setWorldName] = useState('')
@@ -66,21 +65,25 @@ export default function DMPortal() {
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
 
-  // Player state
   const [players, setPlayers] = useState<any[]>([])
   const [newName, setNewName] = useState('')
   const [newEmail, setNewEmail] = useState('')
 
-  // Knowledge state
+  const [parties, setParties] = useState<any[]>([])
+  const [newPartyName, setNewPartyName] = useState('')
+  const [newPartyDesc, setNewPartyDesc] = useState('')
+
   const [selectedPlayer, setSelectedPlayer] = useState<any>(null)
   const [knowledge, setKnowledge] = useState<any[]>([])
   const [sessions, setSessions] = useState<any[]>([])
   const [newKnow, setNewKnow] = useState({ category: 'lore', title: '', content: '' })
+  const [grantTarget, setGrantTarget] = useState<'player' | 'party'>('player')
+  const [selectedPartyForGrant, setSelectedPartyForGrant] = useState<string>('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editData, setEditData] = useState({ title: '', content: '', category: 'lore' })
   const [knowledgeTab, setKnowledgeTab] = useState<'ledger' | 'sessions'>('ledger')
+  const [grantMsg, setGrantMsg] = useState('')
 
-  // Log state
   const [logs, setLogs] = useState<any[]>([])
   const [logFilter, setLogFilter] = useState('all')
 
@@ -88,7 +91,7 @@ export default function DMPortal() {
   const authH = token ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } : {} as any
 
   useEffect(() => { if (session) loadWorlds() }, [session])
-  useEffect(() => { if (activeWorldId) { loadPlayers(); loadLogs() } }, [activeWorldId])
+  useEffect(() => { if (activeWorldId) { loadPlayers(); loadLogs(); loadParties() } }, [activeWorldId])
 
   async function loadWorlds() {
     const r = await fetch('/api/dm/worlds', { headers: authH })
@@ -131,9 +134,37 @@ export default function DMPortal() {
   }
 
   async function deletePlayer(id: string) {
-    if (!confirm('Remove this player? All their messages will be deleted.')) return
+    if (!confirm('Remove this player?')) return
     await fetch('/api/dm/players', { method: 'DELETE', headers: authH, body: JSON.stringify({ playerId: id }) })
     setPlayers(p => p.filter(x => x.id !== id))
+  }
+
+  async function loadParties() {
+    if (!activeWorldId) return
+    const r = await fetch(`/api/dm/parties?worldId=${activeWorldId}`, { headers: authH })
+    const d = await r.json()
+    setParties(d.parties || [])
+  }
+
+  async function addParty() {
+    if (!newPartyName.trim() || !activeWorldId) return
+    const r = await fetch('/api/dm/parties', { method: 'POST', headers: authH, body: JSON.stringify({ worldId: activeWorldId, name: newPartyName, description: newPartyDesc }) })
+    const d = await r.json()
+    if (d.party) { setParties(p => [...p, d.party]); setNewPartyName(''); setNewPartyDesc('') }
+  }
+
+  async function deleteParty(id: string) {
+    if (!confirm('Delete this party?')) return
+    await fetch('/api/dm/parties', { method: 'DELETE', headers: authH, body: JSON.stringify({ partyId: id }) })
+    setParties(p => p.filter(x => x.id !== id))
+  }
+
+  async function togglePartyMember(partyId: string, playerId: string, isMember: boolean) {
+    await fetch('/api/dm/parties', {
+      method: 'PATCH', headers: authH,
+      body: JSON.stringify({ partyId, playerId, action: isMember ? 'remove' : 'add' })
+    })
+    await loadParties()
   }
 
   async function loadPlayerKnowledge(player: any) {
@@ -145,10 +176,30 @@ export default function DMPortal() {
   }
 
   async function grantKnowledge() {
-    if (!newKnow.title.trim() || !newKnow.content.trim() || !selectedPlayer) return
-    const r = await fetch('/api/dm/knowledge', { method: 'POST', headers: authH, body: JSON.stringify({ playerId: selectedPlayer.id, ...newKnow }) })
+    if (!newKnow.title.trim() || !newKnow.content.trim()) return
+    setGrantMsg('')
+
+    const body: any = { ...newKnow }
+    if (grantTarget === 'player' && selectedPlayer) {
+      body.playerId = selectedPlayer.id
+    } else if (grantTarget === 'party' && selectedPartyForGrant) {
+      body.partyId = selectedPartyForGrant
+    } else {
+      setGrantMsg('Select a character or party to grant to.')
+      return
+    }
+
+    const r = await fetch('/api/dm/knowledge', { method: 'POST', headers: authH, body: JSON.stringify(body) })
     const d = await r.json()
-    if (d.entry) { setKnowledge(k => [...k, d.entry]); setNewKnow({ category: 'lore', title: '', content: '' }) }
+
+    if (d.error) {
+      setGrantMsg('Error: ' + d.error)
+    } else {
+      const count = d.grantedTo || 1
+      setGrantMsg(`✓ Granted to ${count} character${count > 1 ? 's' : ''}`)
+      setNewKnow({ category: 'lore', title: '', content: '' })
+      if (grantTarget === 'player' && selectedPlayer) await loadPlayerKnowledge(selectedPlayer)
+    }
   }
 
   async function toggleKnowledge(entryId: string, is_active: boolean) {
@@ -185,6 +236,7 @@ export default function DMPortal() {
   const TABS = [
     { id: 'world', label: '📜 World' },
     { id: 'players', label: '⚔ Players' },
+    { id: 'parties', label: '🛡 Parties' },
     { id: 'knowledge', label: '🧠 Knowledge' },
     { id: 'logs', label: '📋 Logs' },
   ] as const
@@ -211,11 +263,11 @@ export default function DMPortal() {
 
         <main style={s.main}>
 
-          {/* ── WORLD TAB ── */}
+          {/* WORLD TAB */}
           {tab === 'world' && (
             <div>
               <h1 style={s.pageTitle}>World Canon</h1>
-              <p style={s.pageSub}>Your world's lore is the AI DM's source of truth. Paste or type it here.</p>
+              <p style={s.pageSub}>Your world lore is the AI DM's source of truth.</p>
               <div style={s.grid2}>
                 <div style={s.card}>
                   <div style={s.cardTitle}>🌍 World Settings</div>
@@ -235,9 +287,8 @@ export default function DMPortal() {
                   <label style={s.label}>World Name</label>
                   <input style={s.input} value={worldName} onChange={e => setWorldName(e.target.value)} placeholder="e.g. Sorasula" />
                   <label style={s.label}>Description</label>
-                  <textarea style={{ ...s.input, height: 64, resize: 'vertical' }} value={worldDesc} onChange={e => setWorldDesc(e.target.value)} placeholder="Brief description for the AI DM..." />
+                  <textarea style={{ ...s.input, height: 64, resize: 'vertical' as any }} value={worldDesc} onChange={e => setWorldDesc(e.target.value)} placeholder="Brief description for the AI DM..." />
                 </div>
-
                 <div style={s.card}>
                   <div style={s.cardTitle}>📊 Campaign Stats</div>
                   <div style={s.statGrid}>
@@ -245,20 +296,20 @@ export default function DMPortal() {
                     <div style={s.statBox}><div style={s.statVal}>{players.length}</div><div style={s.statLabel}>Players</div></div>
                     <div style={s.statBox}><div style={s.statVal}>{totalMessages}</div><div style={s.statLabel}>Messages</div></div>
                   </div>
+                  <div style={s.statGrid}>
+                    <div style={s.statBox}><div style={s.statVal}>{parties.length}</div><div style={s.statLabel}>Parties</div></div>
+                  </div>
                   {activeWorld && <p style={{ fontSize: 12, color: '#5a4a30', marginTop: 12, fontStyle: 'italic' }}>Last updated: {new Date(activeWorld.updated_at).toLocaleDateString()}</p>}
                 </div>
               </div>
-
               <div style={{ ...s.card, marginTop: 16 }}>
                 <div style={s.cardTitle}>📜 World Canon Text</div>
                 <p style={{ fontSize: 13, color: '#7a6a50', fontStyle: 'italic', marginBottom: 10 }}>
-                  Paste your world lore here. History, factions, locations, NPCs, secrets. The AI DM reads all of this but only shares what each character would know.
+                  Paste your world lore here. The AI DM reads all of this but only shares what each character would know.
                 </p>
-                <textarea style={{ ...s.input, height: 320, resize: 'vertical', fontFamily: 'monospace', fontSize: 13 }}
-                  value={canonText}
-                  onChange={e => setCanonText(e.target.value)}
-                  placeholder={`WORLD: Sorasula\n\nGEOGRAPHY\nSorasula is a floating archipelago...\n\nFACTIONS\nThe Order of the Amber Disc...\n\nSECRETS (DM only)\n...`}
-                />
+                <textarea style={{ ...s.input, height: 320, resize: 'vertical' as any, fontFamily: 'monospace', fontSize: 13 }}
+                  value={canonText} onChange={e => setCanonText(e.target.value)}
+                  placeholder="Paste your world canon here..." />
                 <div style={{ display: 'flex', gap: 10, marginTop: 10, alignItems: 'center' }}>
                   <button style={s.btnPrimary} onClick={saveWorld} disabled={saving}>
                     {saving ? 'Saving...' : activeWorldId ? '💾 Save World' : '✨ Create World'}
@@ -269,12 +320,12 @@ export default function DMPortal() {
             </div>
           )}
 
-          {/* ── PLAYERS TAB ── */}
+          {/* PLAYERS TAB */}
           {tab === 'players' && (
             <div>
               <h1 style={s.pageTitle}>Players</h1>
               <p style={s.pageSub}>Add players and share their unique portal links.</p>
-              {!activeWorldId && <div style={s.warning}>⚠ Create a world first before adding players.</div>}
+              {!activeWorldId && <div style={s.warning}>⚠ Create a world first.</div>}
               <div style={s.grid2}>
                 <div>
                   <div style={s.card}>
@@ -312,13 +363,13 @@ export default function DMPortal() {
                 <div style={s.card}>
                   <div style={s.cardTitle}>🔗 Player Links</div>
                   <p style={{ fontSize: 13, color: '#7a6a50', fontStyle: 'italic', marginBottom: 12 }}>
-                    Each link is unique to that player. They don't need accounts — just the link.
+                    Each link is unique. Players don't need accounts — just the link.
                   </p>
                   {players.length === 0
                     ? <p style={s.empty}>Links appear as you add players.</p>
                     : players.map(p => (
                       <div key={p.id} style={{ marginBottom: 14 }}>
-                        <div style={{ fontSize: 11, color: '#c9933a', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 }}>{p.name}</div>
+                        <div style={{ fontSize: 11, color: '#c9933a', letterSpacing: '0.1em', textTransform: 'uppercase' as any, marginBottom: 4 }}>{p.name}</div>
                         <div style={s.linkBox}>
                           <span style={s.linkUrl}>{typeof window !== 'undefined' ? `${window.location.origin}/play/${p.invite_token}` : `/play/${p.invite_token}`}</span>
                           <button style={s.btnSm} onClick={async e => {
@@ -334,19 +385,114 @@ export default function DMPortal() {
             </div>
           )}
 
-          {/* ── KNOWLEDGE TAB ── */}
+          {/* PARTIES TAB */}
+          {tab === 'parties' && (
+            <div>
+              <h1 style={s.pageTitle}>Parties</h1>
+              <p style={s.pageSub}>Group characters into parties to grant knowledge to everyone at once.</p>
+              {!activeWorldId && <div style={s.warning}>⚠ Create a world first.</div>}
+              <div style={s.grid2}>
+                <div style={s.card}>
+                  <div style={s.cardTitle}>🛡 Create Party</div>
+                  <input style={s.input} value={newPartyName} onChange={e => setNewPartyName(e.target.value)} placeholder="Party name (e.g. The Sorasula Five)" />
+                  <textarea style={{ ...s.input, height: 60, resize: 'vertical' as any }} value={newPartyDesc} onChange={e => setNewPartyDesc(e.target.value)} placeholder="Description (optional)" />
+                  <button style={s.btnPrimary} onClick={addParty} disabled={!activeWorldId || !newPartyName.trim()}>+ Create Party</button>
+                </div>
+
+                <div style={s.card}>
+                  <div style={s.cardTitle}>📋 All Parties ({parties.length})</div>
+                  {parties.length === 0
+                    ? <p style={s.empty}>No parties yet.</p>
+                    : parties.map(party => (
+                      <div key={party.id} style={{ ...s.card, marginBottom: 12, padding: '1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: 15 }}>{party.name}</div>
+                            {party.description && <div style={{ fontSize: 12, color: '#7a6a50', fontStyle: 'italic' }}>{party.description}</div>}
+                          </div>
+                          <button style={{ ...s.btnSm, color: '#c04040', borderColor: '#8b2020' }} onClick={() => deleteParty(party.id)}>✕</button>
+                        </div>
+                        <div style={s.cardTitle}>Members</div>
+                        {players.length === 0
+                          ? <p style={s.empty}>No players available.</p>
+                          : players.map(p => {
+                            const isMember = (party.members || []).some((m: any) => m?.id === p.id)
+                            return (
+                              <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                <input type="checkbox" checked={isMember}
+                                  onChange={() => togglePartyMember(party.id, p.id, isMember)}
+                                  style={{ accentColor: '#c9933a', width: 16, height: 16 }} />
+                                <span style={{ fontSize: 14 }}>{p.name}</span>
+                                {p.character_name && <span style={{ fontSize: 12, color: '#7a6a50', fontStyle: 'italic' }}>({p.character_name})</span>}
+                              </div>
+                            )
+                          })
+                        }
+                      </div>
+                    ))
+                  }
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* KNOWLEDGE TAB */}
           {tab === 'knowledge' && (
             <div>
               <h1 style={s.pageTitle}>Character Knowledge Manager</h1>
-              <p style={s.pageSub}>Grant, edit, or revoke what each character knows. This updates in real time — the AI DM uses it immediately.</p>
-
-              {players.length === 0 && <div style={s.warning}>⚠ Add players first.</div>}
-
+              <p style={s.pageSub}>Grant knowledge to a single character or an entire party at once.</p>
               <div style={s.grid2}>
-                {/* Player selector */}
                 <div>
                   <div style={s.card}>
-                    <div style={s.cardTitle}>Select Character</div>
+                    <div style={s.cardTitle}>➕ Grant Knowledge</div>
+
+                    <label style={s.label}>Grant To</label>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                      <button style={{ ...s.btnSm, ...(grantTarget === 'player' ? { background: 'rgba(201,147,58,0.15)', borderColor: '#c9933a', color: '#e8b86d' } : {}) }}
+                        onClick={() => setGrantTarget('player')}>Single Character</button>
+                      <button style={{ ...s.btnSm, ...(grantTarget === 'party' ? { background: 'rgba(201,147,58,0.15)', borderColor: '#c9933a', color: '#e8b86d' } : {}) }}
+                        onClick={() => setGrantTarget('party')}>Entire Party</button>
+                    </div>
+
+                    {grantTarget === 'player' && (
+                      <>
+                        <label style={s.label}>Character</label>
+                        <select style={s.select} value={selectedPlayer?.id || ''}
+                          onChange={e => {
+                            const p = players.find(x => x.id === e.target.value)
+                            if (p) loadPlayerKnowledge(p)
+                          }}>
+                          <option value="">Select character...</option>
+                          {players.map(p => <option key={p.id} value={p.id}>{p.character_name || p.name}</option>)}
+                        </select>
+                      </>
+                    )}
+
+                    {grantTarget === 'party' && (
+                      <>
+                        <label style={s.label}>Party</label>
+                        <select style={s.select} value={selectedPartyForGrant}
+                          onChange={e => setSelectedPartyForGrant(e.target.value)}>
+                          <option value="">Select party...</option>
+                          {parties.map(p => <option key={p.id} value={p.id}>{p.name} ({(p.members || []).length} members)</option>)}
+                        </select>
+                      </>
+                    )}
+
+                    <label style={s.label}>Category</label>
+                    <select style={s.select} value={newKnow.category} onChange={e => setNewKnow(n => ({ ...n, category: e.target.value }))}>
+                      {KNOWLEDGE_CATEGORIES.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
+                    </select>
+                    <label style={s.label}>Title</label>
+                    <input style={s.input} value={newKnow.title} onChange={e => setNewKnow(n => ({ ...n, title: e.target.value }))} placeholder="e.g. The Vault of Keth" />
+                    <label style={s.label}>What they know</label>
+                    <textarea style={{ ...s.input, height: 80, resize: 'vertical' as any }} value={newKnow.content} onChange={e => setNewKnow(n => ({ ...n, content: e.target.value }))} placeholder="What the character(s) know about this..." />
+                    <button style={s.btnPrimary} onClick={grantKnowledge}>Grant Knowledge</button>
+                    {grantMsg && <p style={{ fontSize: 13, color: grantMsg.startsWith('✓') ? '#5aaa5a' : '#c04040', marginTop: 8 }}>{grantMsg}</p>}
+                  </div>
+
+                  <div style={{ ...s.card, marginTop: 14 }}>
+                    <div style={s.cardTitle}>Select Character to View</div>
                     {players.map(p => (
                       <div key={p.id} style={{ ...s.playerRow, cursor: 'pointer', ...(selectedPlayer?.id === p.id ? { border: '1px solid rgba(201,147,58,0.5)', background: '#231a0a' } : {}) }}
                         onClick={() => loadPlayerKnowledge(p)}>
@@ -355,28 +501,11 @@ export default function DMPortal() {
                           <div style={{ fontWeight: 500 }}>{p.character_name || p.name}</div>
                           <div style={{ fontSize: 12, color: '#7a6a50', fontStyle: 'italic' }}>{p.character_class || 'No class set'}</div>
                         </div>
-                        <span style={{ fontSize: 12, color: '#7a6a50' }}>{knowledge.filter(k => !selectedPlayer || selectedPlayer.id === p.id).length} entries</span>
                       </div>
                     ))}
                   </div>
-
-                  {selectedPlayer && (
-                    <div style={{ ...s.card, marginTop: 14 }}>
-                      <div style={s.cardTitle}>➕ Grant Knowledge</div>
-                      <label style={s.label}>Category</label>
-                      <select style={s.select} value={newKnow.category} onChange={e => setNewKnow(n => ({ ...n, category: e.target.value }))}>
-                        {KNOWLEDGE_CATEGORIES.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
-                      </select>
-                      <label style={s.label}>Title</label>
-                      <input style={s.input} value={newKnow.title} onChange={e => setNewKnow(n => ({ ...n, title: e.target.value }))} placeholder="e.g. The Vault of Keth" />
-                      <label style={s.label}>What they know</label>
-                      <textarea style={{ ...s.input, height: 72, resize: 'vertical' }} value={newKnow.content} onChange={e => setNewKnow(n => ({ ...n, content: e.target.value }))} placeholder="Describe what the character knows about this..." />
-                      <button style={s.btnPrimary} onClick={grantKnowledge}>Grant Knowledge</button>
-                    </div>
-                  )}
                 </div>
 
-                {/* Knowledge ledger + sessions */}
                 <div>
                   {selectedPlayer ? (
                     <>
@@ -392,7 +521,7 @@ export default function DMPortal() {
                       {knowledgeTab === 'ledger' && (
                         <div>
                           {knowledge.length === 0
-                            ? <p style={s.empty}>No knowledge entries yet. Grant some above, or they'll be auto-added after sessions.</p>
+                            ? <p style={s.empty}>No knowledge entries yet.</p>
                             : knowledge.map(k => (
                               <div key={k.id} style={{ ...s.card, marginBottom: 10, opacity: k.is_active ? 1 : 0.45 }}>
                                 {editingId === k.id ? (
@@ -401,7 +530,7 @@ export default function DMPortal() {
                                       {KNOWLEDGE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                                     </select>
                                     <input style={{ ...s.input, marginBottom: 6 }} value={editData.title} onChange={e => setEditData(d => ({ ...d, title: e.target.value }))} />
-                                    <textarea style={{ ...s.input, height: 64, resize: 'vertical' }} value={editData.content} onChange={e => setEditData(d => ({ ...d, content: e.target.value }))} />
+                                    <textarea style={{ ...s.input, height: 64, resize: 'vertical' as any }} value={editData.content} onChange={e => setEditData(d => ({ ...d, content: e.target.value }))} />
                                     <div style={{ display: 'flex', gap: 6 }}>
                                       <button style={s.btnPrimary} onClick={saveEdit}>Save</button>
                                       <button style={s.btnSm} onClick={() => setEditingId(null)}>Cancel</button>
@@ -418,9 +547,7 @@ export default function DMPortal() {
                                       </div>
                                       <div style={{ display: 'flex', gap: 6 }}>
                                         <button style={s.btnSm} onClick={() => { setEditingId(k.id); setEditData({ title: k.title, content: k.content, category: k.category }) }}>Edit</button>
-                                        <button style={{ ...s.btnSm }} onClick={() => toggleKnowledge(k.id, !k.is_active)}>
-                                          {k.is_active ? 'Hide' : 'Show'}
-                                        </button>
+                                        <button style={s.btnSm} onClick={() => toggleKnowledge(k.id, !k.is_active)}>{k.is_active ? 'Hide' : 'Show'}</button>
                                         <button style={{ ...s.btnSm, color: '#c04040', borderColor: '#8b2020' }} onClick={() => deleteKnowledge(k.id)}>✕</button>
                                       </div>
                                     </div>
@@ -436,11 +563,11 @@ export default function DMPortal() {
                       {knowledgeTab === 'sessions' && (
                         <div>
                           {sessions.length === 0
-                            ? <p style={s.empty}>No sessions yet. Summaries are auto-generated when players end a session.</p>
+                            ? <p style={s.empty}>No sessions yet.</p>
                             : sessions.map((sess, i) => (
                               <div key={sess.id} style={{ ...s.card, marginBottom: 10 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                                  <span style={{ fontFamily: 'Georgia, serif', fontSize: 12, color: '#e8b86d', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                                  <span style={{ fontFamily: 'Georgia, serif', fontSize: 12, color: '#e8b86d', letterSpacing: '0.1em', textTransform: 'uppercase' as any }}>
                                     Session {sessions.length - i}
                                   </span>
                                   <span style={{ fontSize: 11, color: '#5a4a30', fontStyle: 'italic' }}>
@@ -449,7 +576,7 @@ export default function DMPortal() {
                                 </div>
                                 {sess.summary
                                   ? <p style={{ fontSize: 13, color: '#b8a888', lineHeight: 1.7 }}>{sess.summary}</p>
-                                  : <p style={{ fontSize: 13, color: '#5a4a30', fontStyle: 'italic' }}>Session in progress or no summary generated.</p>
+                                  : <p style={{ fontSize: 13, color: '#5a4a30', fontStyle: 'italic' }}>No summary yet.</p>
                                 }
                               </div>
                             ))
@@ -459,7 +586,7 @@ export default function DMPortal() {
                     </>
                   ) : (
                     <div style={{ ...s.card, display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200 }}>
-                      <p style={{ color: '#5a4a30', fontStyle: 'italic', fontSize: 15 }}>← Select a character to manage their knowledge</p>
+                      <p style={{ color: '#5a4a30', fontStyle: 'italic', fontSize: 15 }}>← Select a character to view their ledger</p>
                     </div>
                   )}
                 </div>
@@ -467,11 +594,11 @@ export default function DMPortal() {
             </div>
           )}
 
-          {/* ── LOGS TAB ── */}
+          {/* LOGS TAB */}
           {tab === 'logs' && (
             <div>
               <h1 style={s.pageTitle}>Session Logs</h1>
-              <p style={s.pageSub}>Every question and answer, across all players and sessions.</p>
+              <p style={s.pageSub}>Every question and answer across all players.</p>
               <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
                 <select style={{ ...s.select, width: 220 }} value={logFilter} onChange={e => { setLogFilter(e.target.value); loadLogs() }}>
                   <option value="all">All players</option>
@@ -485,7 +612,7 @@ export default function DMPortal() {
                   : logs.map(m => (
                     <div key={m.id} style={s.logEntry}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                        <span style={{ fontFamily: 'Georgia, serif', fontSize: 11, color: '#e8b86d', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                        <span style={{ fontFamily: 'Georgia, serif', fontSize: 11, color: '#e8b86d', letterSpacing: '0.1em', textTransform: 'uppercase' as any }}>
                           {m.players?.character_name || m.players?.name || '?'}{m.players?.character_class ? ` · ${m.players.character_class}` : ''}
                         </span>
                         <div style={{ display: 'flex', gap: 8 }}>
@@ -495,7 +622,7 @@ export default function DMPortal() {
                           <span style={{ fontSize: 11, color: '#5a4a30', fontStyle: 'italic' }}>{new Date(m.created_at).toLocaleString()}</span>
                         </div>
                       </div>
-                      <p style={{ fontSize: 14, color: '#b8a888', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{m.content}</p>
+                      <p style={{ fontSize: 14, color: '#b8a888', lineHeight: 1.7, whiteSpace: 'pre-wrap' as any }}>{m.content}</p>
                     </div>
                   ))
                 }
@@ -525,25 +652,25 @@ const s: Record<string, React.CSSProperties> = {
   grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 },
   card: { background: '#1a1206', border: '1px solid rgba(201,147,58,0.18)', borderRadius: 10, padding: '1.25rem' },
   cardTitle: { fontSize: 12, letterSpacing: '0.12em', color: '#e8b86d', marginBottom: 14, textTransform: 'uppercase' },
-  input: { width: '100%', background: '#0d0a07', border: '1px solid rgba(201,147,58,0.2)', borderRadius: 6, padding: '9px 12px', fontFamily: 'Georgia, serif', fontSize: 14, color: '#e8dcc8', outline: 'none', marginBottom: 10, boxSizing: 'border-box' as any },
-  select: { width: '100%', background: '#0d0a07', border: '1px solid rgba(201,147,58,0.2)', borderRadius: 6, padding: '8px 12px', fontFamily: 'Georgia, serif', fontSize: 14, color: '#e8dcc8', outline: 'none', marginBottom: 10, boxSizing: 'border-box' as any },
-  label: { display: 'block', fontSize: 11, color: '#7a6a50', letterSpacing: '0.1em', textTransform: 'uppercase' as any, marginBottom: 4 },
-  btnPrimary: { background: '#c9933a', color: '#0d0a07', border: 'none', borderRadius: 6, padding: '10px 20px', fontFamily: 'Georgia, serif', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: '0.1em', textTransform: 'uppercase' as any, width: '100%' },
+  input: { width: '100%', background: '#0d0a07', border: '1px solid rgba(201,147,58,0.2)', borderRadius: 6, padding: '9px 12px', fontFamily: 'Georgia, serif', fontSize: 14, color: '#e8dcc8', outline: 'none', marginBottom: 10, boxSizing: 'border-box' },
+  select: { width: '100%', background: '#0d0a07', border: '1px solid rgba(201,147,58,0.2)', borderRadius: 6, padding: '8px 12px', fontFamily: 'Georgia, serif', fontSize: 14, color: '#e8dcc8', outline: 'none', marginBottom: 10, boxSizing: 'border-box' },
+  label: { display: 'block', fontSize: 11, color: '#7a6a50', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 },
+  btnPrimary: { background: '#c9933a', color: '#0d0a07', border: 'none', borderRadius: 6, padding: '10px 20px', fontFamily: 'Georgia, serif', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: '0.1em', textTransform: 'uppercase', width: '100%' },
   btnSm: { background: 'transparent', color: '#c9933a', border: '1px solid rgba(201,147,58,0.35)', borderRadius: 5, padding: '4px 10px', fontFamily: 'Georgia, serif', fontSize: 11, cursor: 'pointer' },
-  statGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 },
-  statBox: { background: '#231a0a', border: '1px solid rgba(201,147,58,0.12)', borderRadius: 8, padding: 10, textAlign: 'center' as any },
+  statGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 8 },
+  statBox: { background: '#231a0a', border: '1px solid rgba(201,147,58,0.12)', borderRadius: 8, padding: 10, textAlign: 'center' },
   statVal: { fontSize: 24, fontWeight: 700, color: '#e8b86d' },
-  statLabel: { fontSize: 11, color: '#7a6a50', fontStyle: 'italic' as any, marginTop: 2 },
+  statLabel: { fontSize: 11, color: '#7a6a50', fontStyle: 'italic', marginTop: 2 },
   playerRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', background: '#161008', border: '1px solid rgba(201,147,58,0.12)', borderRadius: 8, marginBottom: 8 },
   playerAvatar: { width: 38, height: 38, borderRadius: '50%', background: '#231a0a', border: '1.5px solid rgba(201,147,58,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#e8b86d', flexShrink: 0 },
   badgeGreen: { fontSize: 10, padding: '2px 7px', border: '1px solid #3a7a3a', borderRadius: 4, color: '#5aaa5a' },
   badgeRed: { fontSize: 10, padding: '2px 7px', border: '1px solid #8b2020', borderRadius: 4, color: '#c04040' },
   linkBox: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#231a0a', border: '1px solid rgba(201,147,58,0.2)', borderRadius: 6 },
-  linkUrl: { fontFamily: 'monospace', fontSize: 12, color: '#c9933a', wordBreak: 'break-all' as any, marginRight: 10 },
+  linkUrl: { fontFamily: 'monospace', fontSize: 12, color: '#c9933a', wordBreak: 'break-all', marginRight: 10 },
   subTab: { fontSize: 12, padding: '8px 16px', border: 'none', background: 'transparent', color: '#7a6a50', cursor: 'pointer', borderBottom: '2px solid transparent', marginBottom: -1 },
   subTabActive: { color: '#e8b86d', borderBottomColor: '#e8b86d' },
-  catBadge: { fontSize: 10, padding: '2px 7px', border: '1px solid rgba(201,147,58,0.3)', borderRadius: 4, color: '#c9933a', textTransform: 'uppercase' as any },
+  catBadge: { fontSize: 10, padding: '2px 7px', border: '1px solid rgba(201,147,58,0.3)', borderRadius: 4, color: '#c9933a', textTransform: 'uppercase' },
   logEntry: { padding: '12px 0', borderBottom: '1px solid rgba(201,147,58,0.08)' },
   warning: { padding: '10px 14px', background: 'rgba(139,32,32,0.1)', border: '1px solid rgba(192,64,64,0.3)', borderRadius: 8, fontSize: 13, color: '#c04040', marginBottom: 16 },
-  empty: { fontSize: 13, color: '#7a6a50', fontStyle: 'italic' as any },
+  empty: { fontSize: 13, color: '#7a6a50', fontStyle: 'italic' },
 }
