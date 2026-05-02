@@ -22,7 +22,6 @@ export default function PlayerPortal() {
   const [sheetText, setSheetText] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState('')
-  const [pdfStatus, setPdfStatus] = useState('')
 
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -155,43 +154,9 @@ export default function PlayerPortal() {
                 </div>
                 <div>
                   <div style={s.card}>
-                    <div style={s.cardTitle}>📄 Character Sheet</div>
-                    <p style={{ fontSize: 12, color: '#7a6a50', fontStyle: 'italic', marginBottom: 10 }}>Upload a PDF from Roll20, or paste text below.</p>
-                    <input
-                      type="file"
-                      accept=".pdf"
-                      id="pdfUpload"
-                      style={{ display: 'none' }}
-                      onChange={async e => {
-                        const file = e.target.files?.[0]
-                        if (!file) return
-                        setPdfStatus('Uploading...')
-                        const form = new FormData()
-                        form.append('token', token)
-                        form.append('file', file)
-                        const r = await fetch('/api/player/upload-sheet', { method: 'POST', body: form })
-                        const d = await r.json()
-                        if (d.success) {
-                          setSheetText(d.preview + '...')
-                          setPdfStatus(`✓ PDF loaded — ${Math.round(d.length / 1000)}K chars extracted`)
-                        } else {
-                          setPdfStatus('Error: ' + d.error)
-                        }
-                      }}
-                    />
-                    <button style={{ ...s.btnPrimary, marginBottom: 10 }} onClick={() => document.getElementById('pdfUpload')?.click()}>
-                      📎 Upload Character Sheet PDF
-                    </button>
-                    {pdfStatus && <p style={{ fontSize: 12, color: pdfStatus.startsWith('✓') ? '#5aaa5a' : '#c04040', marginBottom: 8 }}>{pdfStatus}</p>}
-                    <textarea style={{ ...s.input, height: 80, resize: 'vertical' as any, fontFamily: 'monospace', fontSize: 12 }} value={sheetText} onChange={e => setSheetText(e.target.value)} placeholder="Or paste character sheet text here..." />
-                  </div>
-                  <div style={{ ...s.card, marginTop: 14 }}>
-                    <div style={s.cardTitle}>⚙ Stats</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      {Object.keys(stats).map(stat => (
-                        <input key={stat} style={{ ...s.input, margin: 0 }} value={stats[stat as keyof typeof stats]} onChange={e => setStats(p => ({ ...p, [stat]: e.target.value }))} placeholder={stat} />
-                      ))}
-                    </div>
+  <div style={s.cardTitle}>📄 Character Sheet</div>
+  <textarea style={{ ...s.input, height: 120, resize: 'vertical' as any, fontFamily: 'monospace', fontSize: 12 }} value={sheetText} onChange={e => setSheetText(e.target.value)} placeholder="Paste character sheet contents here..." />
+</div>
                   </div>
                   {saveStatus && <p style={{ fontSize: 13, color: saveStatus.startsWith('✓') ? '#5aaa5a' : '#c04040', margin: '8px 0' }}>{saveStatus}</p>}
                   <button style={{ ...s.btnPrimary, marginTop: 14, width: '100%' }} onClick={saveCharacter} disabled={saving}>
