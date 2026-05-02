@@ -276,9 +276,9 @@ export default function DMPortal() {
                       <label style={s.label}>Active World</label>
                       <select style={s.select} value={activeWorldId || ''}
                         onChange={e => {
-                          if (e.target.value === 'new') { setActiveWorldId(null); setWorldName(''); setWorldDesc(''); setCanonText('') }
-                          else { setActiveWorldId(e.target.value); const w = worlds.find(x => x.id === e.target.value); if (w) { setWorldName(w.name); setWorldDesc(w.description || '') } }
-                        }}>
+  if (e.target.value === 'new') { setActiveWorldId(null); setWorldName(''); setWorldDesc(''); setCanonText('') }
+  else { setActiveWorldId(e.target.value); const w = worlds.find(x => x.id === e.target.value); if (w) { setWorldName(w.name); setWorldDesc(w.description || ''); setCanonText(w.canon_text || '') } }
+}}>
                         {worlds.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                         <option value="new">+ New world</option>
                       </select>
