@@ -99,7 +99,7 @@ export default function DMPortal() {
     setWorlds(d.worlds || [])
     if (d.worlds?.length && !activeWorldId) {
       const w = d.worlds[0]
-      setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || '')
+setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || ''); setCanonText(w.canon_text || '')
     }
   }
 
