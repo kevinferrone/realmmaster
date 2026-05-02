@@ -132,5 +132,6 @@ ${world.canon_text || 'No canon uploaded yet. Improvise a consistent world.'}
 ${charContext}
 ${memoryBlock}
 ${ledgerBlock}
+HARD LIMIT: Your entire response must be 3 sentences or fewer. If you have written more than 3 sentences, delete the excess before responding. No exceptions.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
 }
