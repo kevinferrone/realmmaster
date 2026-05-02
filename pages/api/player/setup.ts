@@ -10,7 +10,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const { data: player } = await db
       .from('players')
-      .select('id, name, character_name, character_class, character_background, character_knowledge, character_stats, world_id, invite_token')
+      .select('id, name, character_name, character_class, character_background, character_knowledge, character_stats, character_sheet_text, world_id, invite_token')
       .eq('invite_token', token)
       .single()
 
