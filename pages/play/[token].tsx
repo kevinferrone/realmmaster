@@ -18,7 +18,6 @@ export default function PlayerPortal() {
   const [charClass, setCharClass] = useState('')
   const [charBg, setCharBg] = useState('')
   const [charKnow, setCharKnow] = useState('')
-  const [stats, setStats] = useState({ STR: '', DEX: '', INT: '', WIS: '', CHA: '', CON: '' })
   const [sheetText, setSheetText] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState('')
@@ -58,7 +57,7 @@ export default function PlayerPortal() {
     const r = await fetch('/api/player/setup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, characterName: charName, characterClass: charClass, characterBackground: charBg, characterKnowledge: charKnow, stats, sheetText })
+      body: JSON.stringify({ token, characterName: charName, characterClass: charClass, characterBackground: charBg, characterKnowledge: charKnow, sheetText })
     })
     const d = await r.json()
     if (d.success) {
@@ -158,14 +157,7 @@ export default function PlayerPortal() {
                     <div style={s.cardTitle}>📄 Character Sheet</div>
                     <textarea style={{ ...s.input, height: 120, resize: 'vertical' as any, fontFamily: 'monospace', fontSize: 12 }} value={sheetText} onChange={e => setSheetText(e.target.value)} placeholder="Paste character sheet contents here..." />
                   </div>
-                  <div style={{ ...s.card, marginTop: 14 }}>
-                    <div style={s.cardTitle}>⚙ Stats</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      {Object.keys(stats).map(stat => (
-                        <input key={stat} style={{ ...s.input, margin: 0 }} value={stats[stat as keyof typeof stats]} onChange={e => setStats(p => ({ ...p, [stat]: e.target.value }))} placeholder={stat} />
-                      ))}
-                    </div>
-                  </div>
+                 
                   {saveStatus && <p style={{ fontSize: 13, color: saveStatus.startsWith('✓') ? '#5aaa5a' : '#c04040', margin: '8px 0' }}>{saveStatus}</p>}
                   <button style={{ ...s.btnPrimary, marginTop: 14, width: '100%' }} onClick={saveCharacter} disabled={saving}>
                     {saving ? 'Saving...' : '⚡ Save & Enter the World'}
