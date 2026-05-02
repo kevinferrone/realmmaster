@@ -43,7 +43,6 @@ export default function PlayerPortal() {
       setCharClass(d.player.character_class || '')
       setCharBg(d.player.character_background || '')
       setCharKnow(d.player.character_knowledge || '')
-      setStats(d.player.character_stats || { STR: '', DEX: '', INT: '', WIS: '', CHA: '', CON: '' })
       setSheetText(d.player.character_sheet_text || '')
       setTab('chat')
       setMessages([{ role: 'assistant', content: `Welcome back, ${d.player.character_name}. The world of ${d.world?.name || 'the realm'} holds many secrets. What would you know?`, id: 'welcome' }])
