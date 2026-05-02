@@ -89,4 +89,4 @@ export default function PlayerPortal() {
       setMessages(prev => [...prev, { role: 'assistant', content: d.reply, id: 'dm-' + Date.now() }])
       if (d.sessionId && !sessionId) setSessionId(d.sessionId)
     } else {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'The arcane connection falters... please try again.', id:
+      setMessages(prev => [...prev, { role: 'assistant', content: 'The arcane connection falters... please try again.', id: 'err-' + Date.now() }]), id:
