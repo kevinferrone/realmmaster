@@ -47,8 +47,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Insert reveal (ignore if already revealed)
     const { error: revealError } = await db
       .from('location_reveals')
-      .insert({ location_id: locationId, player_id: pid, world_id: location.world_id })
-      .on('conflict', 'location_id, player_id')
+      .upsert(
+        { location_id: locationId, player_id: pid, world_id: location.world_id },
+        { onConflict: 'location_id,player_id', ignoreDuplicates: true }
+      )
 
     if (!revealError) {
       revealedCount++
