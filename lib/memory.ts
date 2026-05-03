@@ -16,11 +16,14 @@ const RENOWN_LEVELS = [
 
 function getRenownLevel(totalUsed: number) {
   let current = RENOWN_LEVELS[0]
+  let earnedLevels: typeof RENOWN_LEVELS = []
   for (const tier of RENOWN_LEVELS) {
-    if (totalUsed >= tier.points) current = tier
-    else break
+    if (totalUsed >= tier.points) {
+      current = tier
+      earnedLevels.push(tier)
+    } else break
   }
-  return current
+  return { current, earnedLevels }
 }
 
 export interface PlayerMemory {
@@ -101,7 +104,7 @@ export async function buildPlayerMemory(token: string): Promise<PlayerMemory | n
 
   const renownTotals = renownData || { total_earned: 0, total_used: 0 }
   const renownAvailable = renownTotals.total_earned - renownTotals.total_used
-  const renownLevel = getRenownLevel(renownTotals.total_used)
+  const { current: renownLevel, earnedLevels } = getRenownLevel(renownTotals.total_used)
 
   return {
     player,
@@ -110,7 +113,7 @@ export async function buildPlayerMemory(token: string): Promise<PlayerMemory | n
     knowledgeLedger: knowledge || [],
     recentMessages: (recentMsgs || []).reverse(),
     renownLevel: renownLevel.level,
-    renownDescription: renownLevel.description,
+    renownDescription: earnedLevels.map(l => `${l.level}: ${l.description}`).join(' → '),
     renownAvailable,
     renownUsed: renownTotals.total_used,
     renownTransactions: (renownTransactions || []).map(t => `+${t.points} pts: ${t.reason}`)
