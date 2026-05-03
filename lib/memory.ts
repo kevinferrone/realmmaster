@@ -4,14 +4,14 @@ const RENOWN_LEVELS = [
   { points: 0, level: 'Unknown', description: 'Only known by immediate circle of friends and family' },
   { points: 20, level: 'Noticed', description: 'People occasionally glance your way; someone noticed something unusual or brave' },
   { points: 40, level: 'Known', description: 'Word of your actions is spreading; locals whisper your name' },
-  { points: 80, level: 'Notable', description: 'Your reputation is taking hold; mentioned in small crowds' },
-  { points: 160, level: 'Respected', description: 'Communities trust you; people listen when you speak' },
-  { points: 320, level: 'Celebrated', description: "You're the talk of the town; fans and rivals seek you out" },
-  { points: 640, level: 'Famous', description: 'Songs and plays retell your deeds; villains take note' },
-  { points: 1000, level: 'Illustrious', description: 'Your name shines across the realm; inspires courage or jealousy' },
-  { points: 1500, level: 'Heroic', description: 'You are a symbol; monuments and murals bear your likeness' },
-  { points: 2000, level: 'Legendary', description: 'Living legend; your decisions alter world events' },
-  { points: 3000, level: 'Mythic', description: "You've transcended fame; some believe you a god or myth" },
+  { points: 60, level: 'Notable', description: 'Your reputation is taking hold; mentioned in small crowds' },
+  { points: 90, level: 'Respected', description: 'Communities trust you; people listen when you speak' },
+  { points: 120, level: 'Celebrated', description: "You're the talk of the town; fans and rivals seek you out" },
+  { points: 150, level: 'Famous', description: 'Songs and plays retell your deeds; villains take note' },
+  { points: 190, level: 'Illustrious', description: 'Your name shines across the realm; inspires courage or jealousy' },
+  { points: 230, level: 'Heroic', description: 'You are a symbol; monuments and murals bear your likeness' },
+  { points: 270, level: 'Legendary', description: 'Living legend; your decisions alter world events' },
+  { points: 320, level: 'Mythic', description: "You've transcended fame; some believe you a god or myth" },
 ]
 
 function getRenownLevel(totalUsed: number) {
@@ -33,7 +33,6 @@ export interface PlayerMemory {
   renownDescription: string
   renownAvailable: number
   renownUsed: number
-  renownTransactions: string[]
 }
 
 export async function buildPlayerMemory(token: string): Promise<PlayerMemory | null> {
@@ -86,19 +85,11 @@ export async function buildPlayerMemory(token: string): Promise<PlayerMemory | n
     .order('created_at', { ascending: false })
     .limit(12)
 
-const { data: renownData } = await db
+  const { data: renownData } = await db
     .from('renown')
     .select('total_earned, total_used')
     .eq('player_id', player.id)
     .single()
-
-  // Load renown transaction history for narrative context
-  const { data: renownTransactions } = await db
-    .from('renown_transactions')
-    .select('points, reason, type, created_at')
-    .eq('player_id', player.id)
-    .eq('type', 'earned')
-    .order('created_at', { ascending: true })
 
   const renownTotals = renownData || { total_earned: 0, total_used: 0 }
   const renownAvailable = renownTotals.total_earned - renownTotals.total_used
@@ -113,9 +104,9 @@ const { data: renownData } = await db
     renownLevel: renownLevel.level,
     renownDescription: renownLevel.description,
     renownAvailable,
-    renownUsed: renownTotals.total_used,
-    renownTransactions: (renownTransactions || []).map(t => `+${t.points} pts: ${t.reason}`)
+    renownUsed: renownTotals.total_used
   }
+}
 
 export function buildSystemPrompt(memory: PlayerMemory): string {
   const { player, world, sessionSummaries, knowledgeLedger } = memory
@@ -139,18 +130,15 @@ CHARACTER:
   ${player.character_sheet_text ? `\nCharacter sheet:\n${player.character_sheet_text.slice(0, 1500)}` : ''}
 ` : 'No character set up. Treat as anonymous traveler with minimal knowledge.'
 
-const renownTransactionLog = memory.renownTransactions.length > 0
-    ? `\n  Deeds that earned renown:\n${memory.renownTransactions.map(t => `    - ${t}`).join('\n')}`
-    : ''
-
   const renownBlock = `
 RENOWN STATUS:
   Level: ${memory.renownLevel}
   Description: ${memory.renownDescription}
   Points Used: ${memory.renownUsed}
-  Points Available: ${memory.renownAvailable}${renownTransactionLog}
+  Points Available: ${memory.renownAvailable}
 
-Reflect this character's renown naturally. The deeds listed above are things this character actually did and should remember. NPCs react to their renown level accordingly.`
+Reflect this character's renown naturally. An Unknown character is ignored by strangers. A Celebrated character gets recognized in taverns. A Legendary character causes people to step aside. NPCs react accordingly.`
+
   const memoryBlock = sessionSummaries ? `
 CAMPAIGN HISTORY:
 ${sessionSummaries}
