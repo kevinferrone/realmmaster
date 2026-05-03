@@ -4,14 +4,14 @@ const RENOWN_LEVELS = [
   { points: 0, level: 'Unknown', description: 'Only known by immediate circle of friends and family' },
   { points: 20, level: 'Noticed', description: 'People occasionally glance your way; someone noticed something unusual or brave' },
   { points: 40, level: 'Known', description: 'Word of your actions is spreading; locals whisper your name' },
-  { points: 60, level: 'Notable', description: 'Your reputation is taking hold; mentioned in small crowds' },
-  { points: 90, level: 'Respected', description: 'Communities trust you; people listen when you speak' },
-  { points: 120, level: 'Celebrated', description: "You're the talk of the town; fans and rivals seek you out" },
-  { points: 150, level: 'Famous', description: 'Songs and plays retell your deeds; villains take note' },
-  { points: 190, level: 'Illustrious', description: 'Your name shines across the realm; inspires courage or jealousy' },
-  { points: 230, level: 'Heroic', description: 'You are a symbol; monuments and murals bear your likeness' },
-  { points: 270, level: 'Legendary', description: 'Living legend; your decisions alter world events' },
-  { points: 320, level: 'Mythic', description: "You've transcended fame; some believe you a god or myth" },
+  { points: 80, level: 'Notable', description: 'Your reputation is taking hold; mentioned in small crowds' },
+  { points: 160, level: 'Respected', description: 'Communities trust you; people listen when you speak' },
+  { points: 320, level: 'Celebrated', description: "You're the talk of the town; fans and rivals seek you out" },
+  { points: 640, level: 'Famous', description: 'Songs and plays retell your deeds; villains take note' },
+  { points: 1000, level: 'Illustrious', description: 'Your name shines across the realm; inspires courage or jealousy' },
+  { points: 1500, level: 'Heroic', description: 'You are a symbol; monuments and murals bear your likeness' },
+  { points: 2000, level: 'Legendary', description: 'Living legend; your decisions alter world events' },
+  { points: 3000, level: 'Mythic', description: "You've transcended fame; some believe you a god or myth" },
 ]
 
 function getRenownLevel(totalUsed: number) {
