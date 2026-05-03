@@ -4,6 +4,29 @@ import { getSupabaseBrowser } from '../lib/supabase'
 
 const KNOWLEDGE_CATEGORIES = ['location', 'npc', 'faction', 'event', 'secret', 'item', 'lore']
 
+const RENOWN_LEVELS = [
+  { points: 0, level: 'Unknown', description: 'Only known by immediate circle of friends and family' },
+  { points: 20, level: 'Noticed', description: 'People occasionally glance your way; someone noticed something unusual or brave' },
+  { points: 40, level: 'Known', description: 'Word of your actions is spreading; locals whisper your name' },
+  { points: 60, level: 'Notable', description: 'Your reputation is taking hold; mentioned in small crowds' },
+  { points: 90, level: 'Respected', description: 'Communities trust you; people listen when you speak' },
+  { points: 120, level: 'Celebrated', description: "You're the talk of the town; fans and rivals seek you out" },
+  { points: 150, level: 'Famous', description: 'Songs and plays retell your deeds; villains take note' },
+  { points: 190, level: 'Illustrious', description: 'Your name shines across the realm; inspires courage or jealousy' },
+  { points: 230, level: 'Heroic', description: 'You are a symbol; monuments and murals bear your likeness' },
+  { points: 270, level: 'Legendary', description: 'Living legend; your decisions alter world events' },
+  { points: 320, level: 'Mythic', description: "You've transcended fame; some believe you a god or myth" },
+]
+
+function getRenownLevel(totalUsed: number) {
+  let current = RENOWN_LEVELS[0]
+  for (const tier of RENOWN_LEVELS) {
+    if (totalUsed >= tier.points) current = tier
+    else break
+  }
+  return current
+}
+
 function useAuth() {
   const [session, setSession] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -55,7 +78,7 @@ function AuthScreen() {
 
 export default function DMPortal() {
   const { session, loading } = useAuth()
-  const [tab, setTab] = useState<'world' | 'players' | 'parties' | 'knowledge' | 'logs'>('world')
+  const [tab, setTab] = useState<'world' | 'players' | 'parties' | 'knowledge' | 'renown' | 'logs'>('world')
 
   const [worlds, setWorlds] = useState<any[]>([])
   const [activeWorldId, setActiveWorldId] = useState<string | null>(null)
@@ -78,11 +101,18 @@ export default function DMPortal() {
   const [sessions, setSessions] = useState<any[]>([])
   const [newKnow, setNewKnow] = useState({ category: 'lore', title: '', content: '' })
   const [grantTarget, setGrantTarget] = useState<'player' | 'party'>('player')
-  const [selectedPartyForGrant, setSelectedPartyForGrant] = useState<string>('')
+  const [selectedPartyForGrant, setSelectedPartyForGrant] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editData, setEditData] = useState({ title: '', content: '', category: 'lore' })
   const [knowledgeTab, setKnowledgeTab] = useState<'ledger' | 'sessions'>('ledger')
   const [grantMsg, setGrantMsg] = useState('')
+
+  const [renownMap, setRenownMap] = useState<Record<string, any>>({})
+  const [newRenown, setNewRenown] = useState({ points: '', reason: '' })
+  const [renownTarget, setRenownTarget] = useState<'player' | 'party'>('player')
+  const [selectedPartyForRenown, setSelectedPartyForRenown] = useState('')
+  const [renownGrantPlayer, setRenownGrantPlayer] = useState('')
+  const [renownMsg, setRenownMsg] = useState('')
 
   const [logs, setLogs] = useState<any[]>([])
   const [logFilter, setLogFilter] = useState('all')
@@ -91,7 +121,7 @@ export default function DMPortal() {
   const authH = token ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } : {} as any
 
   useEffect(() => { if (session) loadWorlds() }, [session])
-  useEffect(() => { if (activeWorldId) { loadPlayers(); loadLogs(); loadParties() } }, [activeWorldId])
+  useEffect(() => { if (activeWorldId) { loadPlayers(); loadLogs(); loadParties(); loadRenown() } }, [activeWorldId])
 
   async function loadWorlds() {
     const r = await fetch('/api/dm/worlds', { headers: authH })
@@ -99,7 +129,7 @@ export default function DMPortal() {
     setWorlds(d.worlds || [])
     if (d.worlds?.length && !activeWorldId) {
       const w = d.worlds[0]
-setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || ''); setCanonText(w.canon_text || '')
+      setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || ''); setCanonText(w.canon_text || '')
     }
   }
 
@@ -160,10 +190,7 @@ setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || '');
   }
 
   async function togglePartyMember(partyId: string, playerId: string, isMember: boolean) {
-    await fetch('/api/dm/parties', {
-      method: 'PATCH', headers: authH,
-      body: JSON.stringify({ partyId, playerId, action: isMember ? 'remove' : 'add' })
-    })
+    await fetch('/api/dm/parties', { method: 'PATCH', headers: authH, body: JSON.stringify({ partyId, playerId, action: isMember ? 'remove' : 'add' }) })
     await loadParties()
   }
 
@@ -178,20 +205,17 @@ setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || '');
   async function grantKnowledge() {
     if (!newKnow.title.trim() || !newKnow.content.trim()) return
     setGrantMsg('')
-
     const body: any = { ...newKnow }
     if (grantTarget === 'player' && selectedPlayer) {
       body.playerId = selectedPlayer.id
     } else if (grantTarget === 'party' && selectedPartyForGrant) {
       body.partyId = selectedPartyForGrant
     } else {
-      setGrantMsg('Select a character or party to grant to.')
+      setGrantMsg('Select a character or party.')
       return
     }
-
     const r = await fetch('/api/dm/knowledge', { method: 'POST', headers: authH, body: JSON.stringify(body) })
     const d = await r.json()
-
     if (d.error) {
       setGrantMsg('Error: ' + d.error)
     } else {
@@ -219,6 +243,39 @@ setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || '');
     setKnowledge(k => k.filter(e => e.id !== entryId))
   }
 
+  async function loadRenown() {
+    if (!activeWorldId) return
+    const r = await fetch(`/api/dm/renown?worldId=${activeWorldId}`, { headers: authH })
+    const d = await r.json()
+    const map: Record<string, any> = {}
+    for (const entry of d.renown || []) map[entry.player_id] = entry
+    setRenownMap(map)
+  }
+
+  async function grantRenown() {
+    const points = parseInt(newRenown.points)
+    if (!points || points <= 0) { setRenownMsg('Enter a valid point amount.'); return }
+    setRenownMsg('')
+    const body: any = { points, reason: newRenown.reason }
+    if (renownTarget === 'player' && renownGrantPlayer) {
+      body.playerId = renownGrantPlayer
+    } else if (renownTarget === 'party' && selectedPartyForRenown) {
+      body.partyId = selectedPartyForRenown
+    } else {
+      setRenownMsg('Select a player or party.')
+      return
+    }
+    const r = await fetch('/api/dm/renown', { method: 'POST', headers: authH, body: JSON.stringify(body) })
+    const d = await r.json()
+    if (d.success) {
+      setRenownMsg(`✓ Granted ${points} renown to ${d.grantedTo} character${d.grantedTo > 1 ? 's' : ''}`)
+      setNewRenown({ points: '', reason: '' })
+      loadRenown()
+    } else {
+      setRenownMsg('Error: ' + d.error)
+    }
+  }
+
   async function loadLogs() {
     if (!activeWorldId) return
     const pid = logFilter !== 'all' ? `&playerId=${logFilter}` : ''
@@ -238,6 +295,7 @@ setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || '');
     { id: 'players', label: '⚔ Players' },
     { id: 'parties', label: '🛡 Parties' },
     { id: 'knowledge', label: '🧠 Knowledge' },
+    { id: 'renown', label: '⭐ Renown' },
     { id: 'logs', label: '📋 Logs' },
   ] as const
 
@@ -263,7 +321,6 @@ setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || '');
 
         <main style={s.main}>
 
-          {/* WORLD TAB */}
           {tab === 'world' && (
             <div>
               <h1 style={s.pageTitle}>World Canon</h1>
@@ -276,9 +333,9 @@ setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || '');
                       <label style={s.label}>Active World</label>
                       <select style={s.select} value={activeWorldId || ''}
                         onChange={e => {
-  if (e.target.value === 'new') { setActiveWorldId(null); setWorldName(''); setWorldDesc(''); setCanonText('') }
-  else { setActiveWorldId(e.target.value); const w = worlds.find(x => x.id === e.target.value); if (w) { setWorldName(w.name); setWorldDesc(w.description || ''); setCanonText(w.canon_text || '') } }
-}}>
+                          if (e.target.value === 'new') { setActiveWorldId(null); setWorldName(''); setWorldDesc(''); setCanonText('') }
+                          else { setActiveWorldId(e.target.value); const w = worlds.find(x => x.id === e.target.value); if (w) { setWorldName(w.name); setWorldDesc(w.description || ''); setCanonText(w.canon_text || '') } }
+                        }}>
                         {worlds.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                         <option value="new">+ New world</option>
                       </select>
@@ -296,7 +353,7 @@ setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || '');
                     <div style={s.statBox}><div style={s.statVal}>{players.length}</div><div style={s.statLabel}>Players</div></div>
                     <div style={s.statBox}><div style={s.statVal}>{totalMessages}</div><div style={s.statLabel}>Messages</div></div>
                   </div>
-                  <div style={s.statGrid}>
+                  <div style={{ ...s.statGrid, marginTop: 8 }}>
                     <div style={s.statBox}><div style={s.statVal}>{parties.length}</div><div style={s.statLabel}>Parties</div></div>
                   </div>
                   {activeWorld && <p style={{ fontSize: 12, color: '#5a4a30', marginTop: 12, fontStyle: 'italic' }}>Last updated: {new Date(activeWorld.updated_at).toLocaleDateString()}</p>}
@@ -320,7 +377,6 @@ setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || '');
             </div>
           )}
 
-          {/* PLAYERS TAB */}
           {tab === 'players' && (
             <div>
               <h1 style={s.pageTitle}>Players</h1>
@@ -350,9 +406,7 @@ setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || '');
                           </div>
                           <span style={p.character_name ? s.badgeGreen : s.badgeRed}>{p.character_name ? 'Ready' : 'Pending'}</span>
                           <button style={{ ...s.btnSm, marginLeft: 8 }}
-                            onClick={() => { setSelectedPlayer(p); setTab('knowledge'); loadPlayerKnowledge(p) }}>
-                            🧠
-                          </button>
+                            onClick={() => { setSelectedPlayer(p); setTab('knowledge'); loadPlayerKnowledge(p) }}>🧠</button>
                           <button style={{ ...s.btnSm, color: '#c04040', borderColor: '#8b2020', marginLeft: 4 }}
                             onClick={() => deletePlayer(p.id)}>✕</button>
                         </div>
@@ -363,7 +417,7 @@ setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || '');
                 <div style={s.card}>
                   <div style={s.cardTitle}>🔗 Player Links</div>
                   <p style={{ fontSize: 13, color: '#7a6a50', fontStyle: 'italic', marginBottom: 12 }}>
-                    Each link is unique. Players don't need accounts — just the link.
+                    Each link is unique. Players do not need accounts — just the link.
                   </p>
                   {players.length === 0
                     ? <p style={s.empty}>Links appear as you add players.</p>
@@ -385,11 +439,10 @@ setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || '');
             </div>
           )}
 
-          {/* PARTIES TAB */}
           {tab === 'parties' && (
             <div>
               <h1 style={s.pageTitle}>Parties</h1>
-              <p style={s.pageSub}>Group characters into parties to grant knowledge to everyone at once.</p>
+              <p style={s.pageSub}>Group characters into parties to grant knowledge or renown to everyone at once.</p>
               {!activeWorldId && <div style={s.warning}>⚠ Create a world first.</div>}
               <div style={s.grid2}>
                 <div style={s.card}>
@@ -398,7 +451,6 @@ setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || '');
                   <textarea style={{ ...s.input, height: 60, resize: 'vertical' as any }} value={newPartyDesc} onChange={e => setNewPartyDesc(e.target.value)} placeholder="Description (optional)" />
                   <button style={s.btnPrimary} onClick={addParty} disabled={!activeWorldId || !newPartyName.trim()}>+ Create Party</button>
                 </div>
-
                 <div style={s.card}>
                   <div style={s.cardTitle}>📋 All Parties ({parties.length})</div>
                   {parties.length === 0
@@ -413,21 +465,18 @@ setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || '');
                           <button style={{ ...s.btnSm, color: '#c04040', borderColor: '#8b2020' }} onClick={() => deleteParty(party.id)}>✕</button>
                         </div>
                         <div style={s.cardTitle}>Members</div>
-                        {players.length === 0
-                          ? <p style={s.empty}>No players available.</p>
-                          : players.map(p => {
-                            const isMember = (party.members || []).some((m: any) => m?.id === p.id)
-                            return (
-                              <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                                <input type="checkbox" checked={isMember}
-                                  onChange={() => togglePartyMember(party.id, p.id, isMember)}
-                                  style={{ accentColor: '#c9933a', width: 16, height: 16 }} />
-                                <span style={{ fontSize: 14 }}>{p.name}</span>
-                                {p.character_name && <span style={{ fontSize: 12, color: '#7a6a50', fontStyle: 'italic' }}>({p.character_name})</span>}
-                              </div>
-                            )
-                          })
-                        }
+                        {players.map(p => {
+                          const isMember = (party.members || []).some((m: any) => m?.id === p.id)
+                          return (
+                            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                              <input type="checkbox" checked={isMember}
+                                onChange={() => togglePartyMember(party.id, p.id, isMember)}
+                                style={{ accentColor: '#c9933a', width: 16, height: 16 }} />
+                              <span style={{ fontSize: 14 }}>{p.name}</span>
+                              {p.character_name && <span style={{ fontSize: 12, color: '#7a6a50', fontStyle: 'italic' }}>({p.character_name})</span>}
+                            </div>
+                          )
+                        })}
                       </div>
                     ))
                   }
@@ -436,7 +485,6 @@ setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || '');
             </div>
           )}
 
-          {/* KNOWLEDGE TAB */}
           {tab === 'knowledge' && (
             <div>
               <h1 style={s.pageTitle}>Character Knowledge Manager</h1>
@@ -445,7 +493,6 @@ setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || '');
                 <div>
                   <div style={s.card}>
                     <div style={s.cardTitle}>➕ Grant Knowledge</div>
-
                     <label style={s.label}>Grant To</label>
                     <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
                       <button style={{ ...s.btnSm, ...(grantTarget === 'player' ? { background: 'rgba(201,147,58,0.15)', borderColor: '#c9933a', color: '#e8b86d' } : {}) }}
@@ -453,32 +500,25 @@ setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || '');
                       <button style={{ ...s.btnSm, ...(grantTarget === 'party' ? { background: 'rgba(201,147,58,0.15)', borderColor: '#c9933a', color: '#e8b86d' } : {}) }}
                         onClick={() => setGrantTarget('party')}>Entire Party</button>
                     </div>
-
                     {grantTarget === 'player' && (
                       <>
                         <label style={s.label}>Character</label>
                         <select style={s.select} value={selectedPlayer?.id || ''}
-                          onChange={e => {
-                            const p = players.find(x => x.id === e.target.value)
-                            if (p) loadPlayerKnowledge(p)
-                          }}>
+                          onChange={e => { const p = players.find(x => x.id === e.target.value); if (p) loadPlayerKnowledge(p) }}>
                           <option value="">Select character...</option>
                           {players.map(p => <option key={p.id} value={p.id}>{p.character_name || p.name}</option>)}
                         </select>
                       </>
                     )}
-
                     {grantTarget === 'party' && (
                       <>
                         <label style={s.label}>Party</label>
-                        <select style={s.select} value={selectedPartyForGrant}
-                          onChange={e => setSelectedPartyForGrant(e.target.value)}>
+                        <select style={s.select} value={selectedPartyForGrant} onChange={e => setSelectedPartyForGrant(e.target.value)}>
                           <option value="">Select party...</option>
                           {parties.map(p => <option key={p.id} value={p.id}>{p.name} ({(p.members || []).length} members)</option>)}
                         </select>
                       </>
                     )}
-
                     <label style={s.label}>Category</label>
                     <select style={s.select} value={newKnow.category} onChange={e => setNewKnow(n => ({ ...n, category: e.target.value }))}>
                       {KNOWLEDGE_CATEGORIES.map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
@@ -490,7 +530,6 @@ setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || '');
                     <button style={s.btnPrimary} onClick={grantKnowledge}>Grant Knowledge</button>
                     {grantMsg && <p style={{ fontSize: 13, color: grantMsg.startsWith('✓') ? '#5aaa5a' : '#c04040', marginTop: 8 }}>{grantMsg}</p>}
                   </div>
-
                   <div style={{ ...s.card, marginTop: 14 }}>
                     <div style={s.cardTitle}>Select Character to View</div>
                     {players.map(p => (
@@ -505,7 +544,6 @@ setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || '');
                     ))}
                   </div>
                 </div>
-
                 <div>
                   {selectedPlayer ? (
                     <>
@@ -517,7 +555,6 @@ setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || '');
                           Session History ({sessions.length})
                         </button>
                       </div>
-
                       {knowledgeTab === 'ledger' && (
                         <div>
                           {knowledge.length === 0
@@ -559,7 +596,6 @@ setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || '');
                           }
                         </div>
                       )}
-
                       {knowledgeTab === 'sessions' && (
                         <div>
                           {sessions.length === 0
@@ -594,7 +630,79 @@ setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || '');
             </div>
           )}
 
-          {/* LOGS TAB */}
+          {tab === 'renown' && (
+            <div>
+              <h1 style={s.pageTitle}>Renown</h1>
+              <p style={s.pageSub}>Grant renown points to players or parties. Players spend them to gain renown levels.</p>
+              <div style={s.grid2}>
+                <div style={s.card}>
+                  <div style={s.cardTitle}>⭐ Grant Renown</div>
+                  <label style={s.label}>Grant To</label>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                    <button style={{ ...s.btnSm, ...(renownTarget === 'player' ? { background: 'rgba(201,147,58,0.15)', borderColor: '#c9933a', color: '#e8b86d' } : {}) }}
+                      onClick={() => setRenownTarget('player')}>Single Player</button>
+                    <button style={{ ...s.btnSm, ...(renownTarget === 'party' ? { background: 'rgba(201,147,58,0.15)', borderColor: '#c9933a', color: '#e8b86d' } : {}) }}
+                      onClick={() => setRenownTarget('party')}>Entire Party</button>
+                  </div>
+                  {renownTarget === 'player' && (
+                    <>
+                      <label style={s.label}>Player</label>
+                      <select style={s.select} value={renownGrantPlayer} onChange={e => setRenownGrantPlayer(e.target.value)}>
+                        <option value="">Select player...</option>
+                        {players.map(p => <option key={p.id} value={p.id}>{p.character_name || p.name}</option>)}
+                      </select>
+                    </>
+                  )}
+                  {renownTarget === 'party' && (
+                    <>
+                      <label style={s.label}>Party</label>
+                      <select style={s.select} value={selectedPartyForRenown} onChange={e => setSelectedPartyForRenown(e.target.value)}>
+                        <option value="">Select party...</option>
+                        {parties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
+                    </>
+                  )}
+                  <label style={s.label}>Points to Grant</label>
+                  <input style={s.input} type="number" value={newRenown.points} onChange={e => setNewRenown(n => ({ ...n, points: e.target.value }))} placeholder="e.g. 20" />
+                  <label style={s.label}>Reason</label>
+                  <input style={s.input} value={newRenown.reason} onChange={e => setNewRenown(n => ({ ...n, reason: e.target.value }))} placeholder="e.g. Defeated the Mongrelfolk ambush" />
+                  <button style={s.btnPrimary} onClick={grantRenown}>⭐ Grant Renown</button>
+                  {renownMsg && <p style={{ fontSize: 13, color: renownMsg.startsWith('✓') ? '#5aaa5a' : '#c04040', marginTop: 8 }}>{renownMsg}</p>}
+                </div>
+                <div style={s.card}>
+                  <div style={s.cardTitle}>📊 Player Renown Status</div>
+                  {players.length === 0
+                    ? <p style={s.empty}>No players yet.</p>
+                    : players.map(p => {
+                      const r = renownMap[p.id] || { total_earned: 0, total_used: 0 }
+                      const available = r.total_earned - r.total_used
+                      const level = getRenownLevel(r.total_used)
+                      return (
+                        <div key={p.id} style={{ ...s.card, marginBottom: 10, padding: '0.875rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: 14 }}>{p.character_name || p.name}</div>
+                              <div style={{ fontSize: 12, color: '#c9933a', fontStyle: 'italic' }}>{level.level}</div>
+                            </div>
+                            <div style={{ textAlign: 'right' as any, fontSize: 12, color: '#7a6a50' }}>
+                              <div>Earned: <span style={{ color: '#5aaa5a' }}>{r.total_earned}</span></div>
+                              <div>Used: <span style={{ color: '#c9933a' }}>{r.total_used}</span></div>
+                              <div>Available: <span style={{ color: '#e8b86d', fontWeight: 600 }}>{available}</span></div>
+                            </div>
+                          </div>
+                          <div style={{ height: 4, background: 'rgba(201,147,58,0.15)', borderRadius: 2, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', background: '#c9933a', borderRadius: 2, width: `${Math.min(100, (r.total_used / 320) * 100)}%` }} />
+                          </div>
+                          <div style={{ fontSize: 11, color: '#5a4a30', marginTop: 4, fontStyle: 'italic' }}>{level.description}</div>
+                        </div>
+                      )
+                    })
+                  }
+                </div>
+              </div>
+            </div>
+          )}
+
           {tab === 'logs' && (
             <div>
               <h1 style={s.pageTitle}>Session Logs</h1>
@@ -657,7 +765,7 @@ const s: Record<string, React.CSSProperties> = {
   label: { display: 'block', fontSize: 11, color: '#7a6a50', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 4 },
   btnPrimary: { background: '#c9933a', color: '#0d0a07', border: 'none', borderRadius: 6, padding: '10px 20px', fontFamily: 'Georgia, serif', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: '0.1em', textTransform: 'uppercase', width: '100%' },
   btnSm: { background: 'transparent', color: '#c9933a', border: '1px solid rgba(201,147,58,0.35)', borderRadius: 5, padding: '4px 10px', fontFamily: 'Georgia, serif', fontSize: 11, cursor: 'pointer' },
-  statGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 8 },
+  statGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 },
   statBox: { background: '#231a0a', border: '1px solid rgba(201,147,58,0.12)', borderRadius: 8, padding: 10, textAlign: 'center' },
   statVal: { fontSize: 24, fontWeight: 700, color: '#e8b86d' },
   statLabel: { fontSize: 11, color: '#7a6a50', fontStyle: 'italic', marginTop: 2 },
