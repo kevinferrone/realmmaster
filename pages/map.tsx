@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import Head from 'next/head'
 import { getSupabaseBrowser } from '../lib/supabase'
 
-const MAP_IMAGE = '/Sorasula_Map_copy.jpg'
+const MAP_IMAGE = 'https://wrhhnnpfmszljpxitcrg.supabase.co/storage/v1/object/public/maps/Sorasula_Map_copy.jpg'
 
 function useAuth() {
   const [session, setSession] = useState<any>(null)
