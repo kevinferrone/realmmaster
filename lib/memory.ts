@@ -33,6 +33,7 @@ export interface PlayerMemory {
   renownDescription: string
   renownAvailable: number
   renownUsed: number
+  renownTransactions: string[]
 }
 
 export async function buildPlayerMemory(token: string): Promise<PlayerMemory | null> {
@@ -85,11 +86,19 @@ export async function buildPlayerMemory(token: string): Promise<PlayerMemory | n
     .order('created_at', { ascending: false })
     .limit(12)
 
-  const { data: renownData } = await db
+const { data: renownData } = await db
     .from('renown')
     .select('total_earned, total_used')
     .eq('player_id', player.id)
     .single()
+
+  // Load renown transaction history for narrative context
+  const { data: renownTransactions } = await db
+    .from('renown_transactions')
+    .select('points, reason, type, created_at')
+    .eq('player_id', player.id)
+    .eq('type', 'earned')
+    .order('created_at', { ascending: true })
 
   const renownTotals = renownData || { total_earned: 0, total_used: 0 }
   const renownAvailable = renownTotals.total_earned - renownTotals.total_used
@@ -104,9 +113,9 @@ export async function buildPlayerMemory(token: string): Promise<PlayerMemory | n
     renownLevel: renownLevel.level,
     renownDescription: renownLevel.description,
     renownAvailable,
-    renownUsed: renownTotals.total_used
+    renownUsed: renownTotals.total_used,
+    renownTransactions: (renownTransactions || []).map(t => `+${t.points} pts: ${t.reason}`)
   }
-}
 
 export function buildSystemPrompt(memory: PlayerMemory): string {
   const { player, world, sessionSummaries, knowledgeLedger } = memory
@@ -130,15 +139,18 @@ CHARACTER:
   ${player.character_sheet_text ? `\nCharacter sheet:\n${player.character_sheet_text.slice(0, 1500)}` : ''}
 ` : 'No character set up. Treat as anonymous traveler with minimal knowledge.'
 
+const renownTransactionLog = memory.renownTransactions.length > 0
+    ? `\n  Deeds that earned renown:\n${memory.renownTransactions.map(t => `    - ${t}`).join('\n')}`
+    : ''
+
   const renownBlock = `
 RENOWN STATUS:
   Level: ${memory.renownLevel}
   Description: ${memory.renownDescription}
   Points Used: ${memory.renownUsed}
-  Points Available: ${memory.renownAvailable}
+  Points Available: ${memory.renownAvailable}${renownTransactionLog}
 
-Reflect this character's renown naturally. An Unknown character is ignored by strangers. A Celebrated character gets recognized in taverns. A Legendary character causes people to step aside. NPCs react accordingly.`
-
+Reflect this character's renown naturally. The deeds listed above are things this character actually did and should remember. NPCs react to their renown level accordingly.`
   const memoryBlock = sessionSummaries ? `
 CAMPAIGN HISTORY:
 ${sessionSummaries}
