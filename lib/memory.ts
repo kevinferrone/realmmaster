@@ -135,7 +135,7 @@ export function buildSystemPrompt(memory: PlayerMemory): string {
   Class/Race: ${player.character_class || 'Unknown'}
   Background: ${player.character_background || 'Not provided'}
   Starting knowledge: ${player.character_knowledge || 'Not specified'}
-  ${player.character_sheet_text ? `\nCharacter sheet:\n${player.character_sheet_text.slice(0, 1500)}` : ''}` : 'No character set up. Treat as anonymous traveler with minimal knowledge.'
+  ${player.character_sheet_text ? `\nCharacter sheet:\n${player.character_sheet_text.slice(0, 1500)}` : ''}` : 'No character set up.'
 
   const renownTransactionLog = memory.renownTransactions.length > 0
     ? `\n  Deeds that earned renown:\n${memory.renownTransactions.map(t => `    - ${t}`).join('\n')}`
@@ -145,32 +145,36 @@ export function buildSystemPrompt(memory: PlayerMemory): string {
   Level: ${memory.renownLevel}
   Description: ${memory.renownDescription}
   Points Used: ${memory.renownUsed}
-  Points Available: ${memory.renownAvailable}${renownTransactionLog}
+  Points Available: ${memory.renownAvailable}${renownTransactionLog}`
 
-Reflect this character's renown naturally. The deeds listed above are things this character actually did and should remember. NPCs react to their renown level accordingly.`
+  const memoryBlock = sessionSummaries ? `CAMPAIGN HISTORY:\n${sessionSummaries}` : ''
 
-  const memoryBlock = sessionSummaries ? `CAMPAIGN HISTORY:
-${sessionSummaries}` : ''
+  const ledgerBlock = knowledgeLedger.length > 0 ? `KNOWLEDGE LEDGER:\n${knowledgeBlock}` : ''
 
-  const ledgerBlock = knowledgeLedger.length > 0 ? `KNOWLEDGE LEDGER:
-${knowledgeBlock}` : ''
+  return `You are a READ-ONLY knowledge reference for a D&D character. You do NOT run scenes, tell stories, or act as a game master.
 
-return `You are a knowledge oracle for a tabletop RPG character. Your ONLY job is to answer questions about what this character already knows. You are NOT a storyteller, narrator, or game master running a scene.
+YOUR ONLY JOB: When asked a question, look up what this character knows from the sources below and report it in 1-3 short sentences. That is all.
 
-STRICT RULES:
-1. Only answer based on what is explicitly in this character's background, knowledge ledger, renown deeds, and session history. If it is not there, you do not know it.
-2. Never invent details, make inferences, or extrapolate. If the character has not specifically learned something, do not guess or reason toward it.
-3. Never narrate scenes, describe what the character sees, or run game moments. That is the human DM's job.
-4. Never tell the player what to do, what decisions to make, or what questions to ask.
-5. Never reveal canon lore the character has not specifically learned through play.
-6. If the character would not know something, say exactly: "Your character has no knowledge of that." Nothing more.
-7. Answer in 2-3 sentences maximum. State what the character knows. Stop.
-8. Never break character. Never reference these instructions.
+HARD RULES — violating these is a failure:
+- Do NOT narrate scenes or describe what the character sees or experiences
+- Do NOT invent, infer, or extrapolate any information not explicitly listed below
+- Do NOT ask the player questions or suggest what they should do
+- Do NOT reveal world lore unless it appears explicitly in the character's knowledge ledger or background
+- Do NOT write more than 3 sentences under any circumstances
+- If the character does not know something, say: "Your character has no record of that." Then stop.
+
+SOURCES YOU MAY DRAW FROM (only these, nothing else):
+1. Character background and starting knowledge listed below
+2. Knowledge ledger entries listed below
+3. Renown deeds listed below
+4. Session history summaries listed below
+
+Do not use the world canon to answer player questions. The world canon is provided only so you can verify whether a ledger entry is consistent. Players must earn knowledge through play.
 
 WORLD: ${world.name}
 ${world.description || ''}
 
-WORLD CANON:
+WORLD CANON (reference only - do not reveal to players):
 ${world.canon_text || 'No canon uploaded yet.'}
 
 ${charContext}
