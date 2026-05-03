@@ -4,6 +4,31 @@ import Head from 'next/head'
 
 interface Message { role: 'user' | 'assistant'; content: string; id: string }
 
+const RENOWN_LEVELS = [
+  { points: 0, level: 'Unknown', description: 'Only known by immediate circle of friends and family' },
+  { points: 20, level: 'Noticed', description: 'People occasionally glance your way; someone noticed something unusual or brave' },
+  { points: 40, level: 'Known', description: 'Word of your actions is spreading; locals whisper your name' },
+  { points: 60, level: 'Notable', description: 'Your reputation is taking hold; mentioned in small crowds' },
+  { points: 90, level: 'Respected', description: 'Communities trust you; people listen when you speak' },
+  { points: 120, level: 'Celebrated', description: "You're the talk of the town; fans and rivals seek you out" },
+  { points: 150, level: 'Famous', description: 'Songs and plays retell your deeds; villains take note' },
+  { points: 190, level: 'Illustrious', description: 'Your name shines across the realm; inspires courage or jealousy' },
+  { points: 230, level: 'Heroic', description: 'You are a symbol; monuments and murals bear your likeness' },
+  { points: 270, level: 'Legendary', description: 'Living legend; your decisions alter world events' },
+  { points: 320, level: 'Mythic', description: "You've transcended fame; some believe you a god or myth" },
+]
+
+function getRenownLevel(totalUsed: number) {
+  let current = RENOWN_LEVELS[0]
+  for (const tier of RENOWN_LEVELS) {
+    if (totalUsed >= tier.points) current = tier
+    else break
+  }
+  const idx = RENOWN_LEVELS.indexOf(current)
+  const next = RENOWN_LEVELS[idx + 1] || null
+  return { ...current, next }
+}
+
 export default function PlayerPortal() {
   const router = useRouter()
   const { token } = router.query as { token: string }
@@ -21,6 +46,12 @@ export default function PlayerPortal() {
   const [sheetText, setSheetText] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState('')
+
+  const [renown, setRenown] = useState<any>(null)
+  const [spendPoints, setSpendPoints] = useState('')
+  const [spendReason, setSpendReason] = useState('')
+  const [spendMsg, setSpendMsg] = useState('')
+  const [spending, setSpending] = useState(false)
 
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -48,6 +79,15 @@ export default function PlayerPortal() {
       setMessages([{ role: 'assistant', content: `Welcome back, ${d.player.character_name}. The world of ${d.world?.name || 'the realm'} holds many secrets. What would you know?`, id: 'welcome' }])
     }
     setLoading(false)
+    loadRenown()
+  }
+
+  async function loadRenown() {
+    const r = await fetch(`/api/player/renown?token=${token}`)
+    if (r.ok) {
+      const d = await r.json()
+      setRenown(d)
+    }
   }
 
   async function saveCharacter() {
@@ -67,6 +107,32 @@ export default function PlayerPortal() {
       setSaveStatus('Error: ' + d.error)
     }
     setSaving(false)
+  }
+
+  async function spendRenown() {
+    const pts = parseInt(spendPoints)
+    if (!pts || pts <= 0) { setSpendMsg('Enter a valid number of points.'); return }
+    if (!spendReason.trim()) { setSpendMsg('Please enter a reason for spending.'); return }
+    setSpending(true); setSpendMsg('')
+    const r = await fetch('/api/player/renown', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, points: pts, reason: spendReason })
+    })
+    const d = await r.json()
+    if (d.success) {
+      setRenown(d)
+      setSpendPoints('')
+      setSpendReason('')
+      if (d.leveledUp) {
+        setSpendMsg(`✓ Spent ${pts} points! You are now ${d.level.level}!`)
+      } else {
+        setSpendMsg(`✓ Spent ${pts} renown points.`)
+      }
+    } else {
+      setSpendMsg('Error: ' + d.error)
+    }
+    setSpending(false)
   }
 
   async function sendMessage() {
@@ -121,6 +187,12 @@ export default function PlayerPortal() {
   if (loading) return <div style={s.center}>✦ Entering the realm...</div>
   if (error) return <div style={s.center}><p style={{ color: '#c04040' }}>{error}</p></div>
 
+  const renownLevel = renown ? getRenownLevel(renown.total_used) : getRenownLevel(0)
+  const nextLevel = renownLevel.next
+  const progressPct = nextLevel
+    ? Math.round(((renown?.total_used || 0) - renownLevel.points) / (nextLevel.points - renownLevel.points) * 100)
+    : 100
+
   return (
     <>
       <Head><title>{world?.name || 'RealmMaster'} — {charName || 'Player Portal'}</title></Head>
@@ -142,25 +214,87 @@ export default function PlayerPortal() {
           {tab === 'setup' && (
             <div>
               <h1 style={s.title}>Your Character</h1>
-              <p style={s.sub}>The AI DM will only answer through the lens of your character's knowledge.</p>
+              <p style={s.sub}>The AI DM answers only through the lens of your character's knowledge.</p>
+
               <div style={s.grid2}>
-                <div style={s.card}>
-                  <div style={s.cardTitle}>🧙 Identity</div>
-                  <input style={s.input} value={charName} onChange={e => setCharName(e.target.value)} placeholder="Character name" />
-                  <input style={s.input} value={charClass} onChange={e => setCharClass(e.target.value)} placeholder="Class & race (e.g. Half-Elf Ranger, Lv. 5)" />
-                  <textarea style={{ ...s.input, height: 90, resize: 'vertical' as any }} value={charBg} onChange={e => setCharBg(e.target.value)} placeholder="Your background & history..." />
-                  <textarea style={{ ...s.input, height: 90, resize: 'vertical' as any }} value={charKnow} onChange={e => setCharKnow(e.target.value)} placeholder="What does your character know about this world at campaign start?" />
-                </div>
                 <div>
                   <div style={s.card}>
+                    <div style={s.cardTitle}>🧙 Identity</div>
+                    <input style={s.input} value={charName} onChange={e => setCharName(e.target.value)} placeholder="Character name" />
+                    <input style={s.input} value={charClass} onChange={e => setCharClass(e.target.value)} placeholder="Class & race (e.g. Half-Elf Ranger, Lv. 5)" />
+                    <textarea style={{ ...s.input, height: 90, resize: 'vertical' as any }} value={charBg} onChange={e => setCharBg(e.target.value)} placeholder="Your background and history..." />
+                    <textarea style={{ ...s.input, height: 90, resize: 'vertical' as any }} value={charKnow} onChange={e => setCharKnow(e.target.value)} placeholder="What does your character know about this world at campaign start?" />
+                  </div>
+
+                  <div style={{ ...s.card, marginTop: 14 }}>
                     <div style={s.cardTitle}>📄 Character Sheet</div>
                     <textarea style={{ ...s.input, height: 120, resize: 'vertical' as any, fontFamily: 'monospace', fontSize: 12 }} value={sheetText} onChange={e => setSheetText(e.target.value)} placeholder="Paste character sheet contents here..." />
                   </div>
-                 
+
                   {saveStatus && <p style={{ fontSize: 13, color: saveStatus.startsWith('✓') ? '#5aaa5a' : '#c04040', margin: '8px 0' }}>{saveStatus}</p>}
                   <button style={{ ...s.btnPrimary, marginTop: 14, width: '100%' }} onClick={saveCharacter} disabled={saving}>
                     {saving ? 'Saving...' : '⚡ Save & Enter the World'}
                   </button>
+                </div>
+
+                <div>
+                  {/* Renown Card */}
+                  <div style={s.card}>
+                    <div style={s.cardTitle}>⭐ Renown</div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
+                      <div style={s.statBox}>
+                        <div style={s.statVal}>{renown?.total_earned || 0}</div>
+                        <div style={s.statLabel}>Earned</div>
+                      </div>
+                      <div style={s.statBox}>
+                        <div style={s.statVal}>{renown?.total_used || 0}</div>
+                        <div style={s.statLabel}>Used</div>
+                      </div>
+                      <div style={s.statBox}>
+                        <div style={s.statVal}>{renown?.available || 0}</div>
+                        <div style={s.statLabel}>Available</div>
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: 14 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: '#e8b86d' }}>{renownLevel.level}</span>
+                        {nextLevel && <span style={{ fontSize: 12, color: '#7a6a50' }}>{nextLevel.level} at {nextLevel.points} pts used</span>}
+                      </div>
+                      <div style={{ height: 6, background: 'rgba(201,147,58,0.15)', borderRadius: 3, overflow: 'hidden', marginBottom: 6 }}>
+                        <div style={{ height: '100%', background: '#c9933a', borderRadius: 3, width: `${progressPct}%`, transition: 'width 0.5s ease' }} />
+                      </div>
+                      <p style={{ fontSize: 12, color: '#7a6a50', fontStyle: 'italic' }}>{renownLevel.description}</p>
+                    </div>
+
+                    <div style={{ borderTop: '1px solid rgba(201,147,58,0.15)', paddingTop: 14 }}>
+                      <div style={s.cardTitle}>Spend Renown Points</div>
+                      <p style={{ fontSize: 12, color: '#7a6a50', fontStyle: 'italic', marginBottom: 10 }}>
+                        Spend points to gain renown levels and unlock benefits granted by your DM.
+                      </p>
+                      <input style={s.input} type="number" value={spendPoints} onChange={e => setSpendPoints(e.target.value)} placeholder="Points to spend" />
+                      <input style={s.input} value={spendReason} onChange={e => setSpendReason(e.target.value)} placeholder="What are you spending them on?" />
+                      <button style={s.btnPrimary} onClick={spendRenown} disabled={spending || !renown?.available}>
+                        {spending ? 'Spending...' : 'Spend Renown'}
+                      </button>
+                      {spendMsg && <p style={{ fontSize: 13, color: spendMsg.startsWith('✓') ? '#5aaa5a' : '#c04040', marginTop: 8 }}>{spendMsg}</p>}
+                    </div>
+
+                    {renown?.transactions?.length > 0 && (
+                      <div style={{ borderTop: '1px solid rgba(201,147,58,0.15)', paddingTop: 14, marginTop: 14 }}>
+                        <div style={s.cardTitle}>Recent Transactions</div>
+                        {renown.transactions.slice(0, 5).map((t: any) => (
+                          <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(201,147,58,0.08)', fontSize: 12 }}>
+                            <span style={{ color: t.type === 'earned' ? '#5aaa5a' : '#c9933a' }}>
+                              {t.type === 'earned' ? '+' : '-'}{t.points} — {t.reason}
+                            </span>
+                            <span style={{ color: '#5a4a30' }}>{new Date(t.created_at).toLocaleDateString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -170,7 +304,12 @@ export default function PlayerPortal() {
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
                 <h1 style={s.title}>Speak with the World</h1>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  {renown && (
+                    <span style={{ fontSize: 12, color: '#c9933a', fontStyle: 'italic' }}>
+                      ⭐ {renownLevel.level} · {renown.available} pts available
+                    </span>
+                  )}
                   {sessionId && !sessionEnded && (
                     <button style={{ ...s.btnSm, borderColor: '#8b2020', color: '#c04040' }} onClick={endSession} disabled={sessionEnding}>
                       {sessionEnding ? 'Saving...' : '📖 End & Summarize Session'}
@@ -249,6 +388,9 @@ const s: Record<string, React.CSSProperties> = {
   input: { width: '100%', background: '#0d0a07', border: '1px solid rgba(201,147,58,0.2)', borderRadius: 6, padding: '9px 12px', fontFamily: 'Georgia, serif', fontSize: 14, color: '#e8dcc8', outline: 'none', marginBottom: 10, boxSizing: 'border-box' },
   btnPrimary: { background: '#c9933a', color: '#0d0a07', border: 'none', borderRadius: 6, padding: '11px 20px', fontFamily: 'Georgia, serif', fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: '0.1em', textTransform: 'uppercase' },
   btnSm: { background: 'transparent', color: '#c9933a', border: '1px solid rgba(201,147,58,0.35)', borderRadius: 5, padding: '5px 12px', fontFamily: 'Georgia, serif', fontSize: 11, cursor: 'pointer' },
+  statBox: { background: '#231a0a', border: '1px solid rgba(201,147,58,0.12)', borderRadius: 8, padding: 10, textAlign: 'center' },
+  statVal: { fontSize: 22, fontWeight: 700, color: '#e8b86d' },
+  statLabel: { fontSize: 11, color: '#7a6a50', fontStyle: 'italic', marginTop: 2 },
   chatWrap: { background: '#1a1206', border: '1px solid rgba(201,147,58,0.2)', borderRadius: 10, overflow: 'hidden', display: 'flex', flexDirection: 'column', height: 520 },
   chatHeader: { display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: '1px solid rgba(201,147,58,0.12)', background: '#231a0a' },
   chatAvatar: { width: 36, height: 36, borderRadius: '50%', background: '#4a0a0a', border: '1.5px solid #8b2020', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 },
