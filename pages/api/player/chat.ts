@@ -39,6 +39,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     { role: 'user' as const, content: message }
   ]
 
+  console.log('RENOWN TRANSACTIONS:', memory.renownTransactions)
+  console.log('RENOWN BLOCK CHECK:', memory.renownUsed, memory.renownLevel)
+  
   const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
