@@ -6,6 +6,10 @@ export interface PlayerMemory {
   sessionSummaries: string
   knowledgeLedger: Array<{ category: string; title: string; content: string }>
   recentMessages: Array<{ role: string; content: string }>
+  renownLevel: string
+  renownDescription: string
+  renownAvailable: number
+  renownUsed: number
 }
 
 // Fetch everything the AI DM needs to know about a player
@@ -48,6 +52,35 @@ export async function buildPlayerMemory(token: string): Promise<PlayerMemory | n
     })
     .join('\n\n')
 
+  // Load renown
+  const { data: renownData } = await db
+    .from('renown')
+    .select('total_earned, total_used')
+    .eq('player_id', player.id)
+    .single()
+
+  const renownTotals = renownData || { total_earned: 0, total_used: 0 }
+  const renownAvailable = renownTotals.total_earned - renownTotals.total_used
+
+  const RENOWN_LEVELS = [
+    { points: 0, level: 'Unknown', description: 'Only known by immediate circle of friends and family' },
+    { points: 20, level: 'Noticed', description: 'People occasionally glance your way; someone noticed something unusual or brave' },
+    { points: 40, level: 'Known', description: 'Word of your actions is spreading; locals whisper your name' },
+    { points: 60, level: 'Notable', description: 'Your reputation is taking hold; mentioned in small crowds' },
+    { points: 90, level: 'Respected', description: 'Communities trust you; people listen when you speak' },
+    { points: 120, level: 'Celebrated', description: "You're the talk of the town; fans and rivals seek you out" },
+    { points: 150, level: 'Famous', description: 'Songs and plays retell your deeds; villains take note' },
+    { points: 190, level: 'Illustrious', description: 'Your name shines across the realm; inspires courage or jealousy' },
+    { points: 230, level: 'Heroic', description: 'You are a symbol; monuments and murals bear your likeness' },
+    { points: 270, level: 'Legendary', description: 'Living legend; your decisions alter world events' },
+    { points: 320, level: 'Mythic', description: "You've transcended fame; some believe you a god or myth" },
+  ]
+  let renownLevel = RENOWN_LEVELS[0]
+  for (const tier of RENOWN_LEVELS) {
+    if (renownTotals.total_used >= tier.points) renownLevel = tier
+    else break
+  }
+  
   // Load character knowledge ledger (active entries only)
   const { data: knowledge } = await db
     .from('character_knowledge')
@@ -64,14 +97,17 @@ export async function buildPlayerMemory(token: string): Promise<PlayerMemory | n
     .order('created_at', { ascending: false })
     .limit(12)
 
-  return {
+return {
     player,
     world,
     sessionSummaries,
     knowledgeLedger: knowledge || [],
-    recentMessages: (recentMsgs || []).reverse()
+    recentMessages: (recentMsgs || []).reverse(),
+    renownLevel: renownLevel.level,
+    renownDescription: renownLevel.description,
+    renownAvailable,
+    renownUsed: renownTotals.total_used
   }
-}
 
 // Build the full system prompt from memory
 export function buildSystemPrompt(memory: PlayerMemory): string {
@@ -88,6 +124,14 @@ export function buildSystemPrompt(memory: PlayerMemory): string {
     `${cat.toUpperCase()}:\n${items.map(i => `  • ${i.title}: ${i.content}`).join('\n')}`
   ).join('\n\n')
 
+  const renownBlock = `
+RENOWN STATUS:
+  Level: ${memory.renownLevel}
+  Description: ${memory.renownDescription}
+  Points Used: ${memory.renownUsed}
+  Points Available to Spend: ${memory.renownAvailable}  
+
+  When answering, reflect this character's renown level naturally. An Unknown character is ignored by strangers. A Celebrated character gets recognized in taverns. A Legendary character causes people to step aside in the street. NPCs react to them accordingly.`
   const charContext = player.character_name ? `
 CHARACTER:
   Name: ${player.character_name}
@@ -130,6 +174,7 @@ WORLD CANON:
 ${world.canon_text || 'No canon uploaded yet. Improvise a consistent world.'}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ${charContext}
+${renownBlock}
 ${memoryBlock}
 ${ledgerBlock}
 HARD LIMIT: Your entire response must be 3 sentences or fewer. If you have written more than 3 sentences, delete the excess before responding. No exceptions.
