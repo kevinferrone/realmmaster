@@ -16,7 +16,7 @@ function ensureSections(canonText: string): string {
   let text = canonText || ''
   for (const section of CANON_SECTIONS) {
     if (!text.includes(section)) {
-      text = text + `\n\n${section}\n`
+      text = text + '\n\n' + section + '\n'
     }
   }
   return text
@@ -25,16 +25,16 @@ function ensureSections(canonText: string): string {
 function appendToSection(canonText: string, section: string, newContent: string): string {
   const text = ensureSections(canonText)
   const sectionIndex = text.indexOf(section)
-  if (sectionIndex === -1) return text + `\n\n${section}\n${newContent}`
+  if (sectionIndex === -1) return text + '\n\n' + section + '\n' + newContent
 
   const afterSection = text.slice(sectionIndex + section.length)
   const nextSectionMatch = afterSection.search(/\n## /)
 
   if (nextSectionMatch === -1) {
-    return text + `\n${newContent}`
+    return text + '\n' + newContent
   } else {
     const insertPoint = sectionIndex + section.length + nextSectionMatch
-    return text.slice(0, insertPoint) + `\n${newContent}` + text.slice(insertPoint)
+    return text.slice(0, insertPoint) + '\n' + newContent + text.slice(insertPoint)
   }
 }
 
@@ -74,6 +74,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'lastUserMessage and lastAssistantMessage required' })
     }
 
+    const prompt = [
+      'You are extracting world-building lore from a D&D world-building conversation.',
+      '',
+      'AVAILABLE CANON SECTIONS:',
+      CANON_SECTIONS.join('\n'),
+      '',
+      'THE EXCHANGE TO EXTRACT FROM:',
+      'DM: ' + lastUserMessage,
+      '',
+      'ASSISTANT: ' + lastAssistantMessage,
+      '',
+      'Extract only the concrete world facts established in this exchange.',
+      'Ignore questions, suggestions, and hypotheticals that were not confirmed.',
+      'Assign each fact to the most appropriate canon section.',
+      'For secrets, villain plans, or DM-only information use: ## DM ONLY — SECRETS & MYSTERIES',
+      '',
+      'Respond with ONLY valid JSON in this exact format:',
+      '[',
+      '  {',
+      '    "section": "## SECTION NAME",',
+      '    "content": "The lore text to add, written as clear factual prose."',
+      '  }',
+      ']',
+      '',
+      'If nothing concrete was established, return an empty array: []'
+    ].join('\n')
+
     const extractionResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -84,12 +111,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       body: JSON.stringify({
         model: 'claude-sonnet-4-5',
         max_tokens: 1024,
-        messages: [{
-          role: 'user',
-          content: `You are extracting world-building lore from a conversation to add to a D&D world canon.
+        messages: [{ role: 'user', content: prompt }]
+      })
+    })
 
-AVAILABLE CANON SECTIONS:
-${CANON_SECTIONS.join('\n')}
+    const extractionData = await extractionResponse.json()
+    const rawText = extractionData.content?.[0]?.text || '[]'
 
-THE EXCHANGE:
-DM: ${lastUserMessage}
+    let preview: any[] = []
+    try {
+      const cleaned = rawText.replace(/```json\n?|\n?```/g, '').trim()
+      preview = JSON.parse(cleaned)
+    } catch {
+      preview = []
+    }
+
+    return res.json({ preview })
+  }
+
+  return res.status(405).end()
+}
