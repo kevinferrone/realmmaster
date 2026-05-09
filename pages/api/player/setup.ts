@@ -18,7 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const { data: world } = await db
       .from('worlds')
-      .select('name, description')
+      .select('name, description, map_image_url')
       .eq('id', player.world_id)
       .single()
 
