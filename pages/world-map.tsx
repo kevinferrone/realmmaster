@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import Head from 'next/head'
 
-const MAP_IMAGE = 'https://wrhhnnpfmszljpxitcrg.supabase.co/storage/v1/object/public/maps/Sorasula_Map_copy.jpg'
 
 export default function PlayerMap() {
   const router = useRouter()
@@ -12,6 +11,7 @@ export default function PlayerMap() {
   const [error, setError] = useState('')
   const [player, setPlayer] = useState<any>(null)
   const [world, setWorld] = useState<any>(null)
+  const [mapImageUrl, setMapImageUrl] = useState<string>('')
   const [locations, setLocations] = useState<any[]>([])
   const [reveals, setReveals] = useState<any[]>([])
   const [selectedPin, setSelectedPin] = useState<any>(null)
@@ -26,6 +26,12 @@ export default function PlayerMap() {
     const pd = await pr.json()
     setPlayer(pd.player)
     setWorld(pd.world)
+
+    // Load world map URL
+    const wr = await fetch('/api/dm/worlds', { headers: { 'Content-Type': 'application/json' } })
+    const wd = await wr.json()
+    const currentWorld = (wd.worlds || []).find((w: any) => w.id === pd.player.world_id)
+    setMapImageUrl(currentWorld?.map_image_url || '')
 
     // Load map locations and reveals
     const mr = await fetch(`/api/dm/map?worldId=${pd.player.world_id}`)
@@ -63,7 +69,10 @@ export default function PlayerMap() {
           {/* MAP */}
           <div style={s.mapWrap}>
             <div ref={mapRef} style={s.mapContainer}>
-              <img src={MAP_IMAGE} alt="World Map" style={s.mapImg} draggable={false} />
+              {mapImageUrl
+                ? <img src={mapImageUrl} alt="World Map" style={s.mapImg} draggable={false} />
+                : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#5a4a30', fontStyle: 'italic' }}>No map available yet.</div>
+              }
 
               {locations.map(loc => {
                 const revealed = isRevealed(loc.id)
