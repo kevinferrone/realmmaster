@@ -317,7 +317,7 @@ export default function DMPortal() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {activeWorld && <span style={s.worldBadge}>{activeWorld.name}</span>}
-            <a href="/map" style={{ textDecoration: 'none' }}>
+            <a href={`/map?worldId=${activeWorldId || ''}`} style={{ textDecoration: 'none' }}>
               <button style={s.btnSm}>🗺 Map</button>
             </a>
             <button style={s.btnSm} onClick={() => getSupabaseBrowser().auth.signOut()}>Sign Out</button>
