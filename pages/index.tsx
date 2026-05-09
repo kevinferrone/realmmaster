@@ -78,9 +78,10 @@ function AuthScreen() {
 
 export default function DMPortal() {
   const { session, loading } = useAuth()
-  const [tab, setTab] = useState<'world' | 'players' | 'parties' | 'knowledge' | 'renown' | 'logs'>('world')
+  const [tab, setTab] = useState<'world' | 'builder' | 'players' | 'parties' | 'knowledge' | 'renown' | 'logs'>('world')
 
   const [worlds, setWorlds] = useState<any[]>([])
+  
   const [activeWorldId, setActiveWorldId] = useState<string | null>(null)
   const [worldName, setWorldName] = useState('')
   const [worldDesc, setWorldDesc] = useState('')
@@ -89,6 +90,16 @@ export default function DMPortal() {
   const [canonText, setCanonText] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
+
+  // World builder state
+  const [wbMessages, setWbMessages] = useState<Array<{role: string, content: string}>>([])
+  const [wbInput, setWbInput] = useState('')
+  const [wbLoading, setWbLoading] = useState(false)
+  const [wbLastExchange, setWbLastExchange] = useState<{user: string, assistant: string} | null>(null)
+  const [wbPreview, setWbPreview] = useState<any>(null)
+  const [wbPreviewLoading, setWbPreviewLoading] = useState(false)
+  const [wbSaving, setWbSaving] = useState(false)
+  const [wbSaveMsg, setWbSaveMsg] = useState('')
 
   const [players, setPlayers] = useState<any[]>([])
   const [newName, setNewName] = useState('')
@@ -278,12 +289,73 @@ export default function DMPortal() {
     }
   }
 
-  async function loadLogs() {
+async function loadLogs() {
     if (!activeWorldId) return
     const pid = logFilter !== 'all' ? `&playerId=${logFilter}` : ''
     const r = await fetch(`/api/dm/logs?worldId=${activeWorldId}${pid}`, { headers: authH })
     const d = await r.json()
     setLogs(d.messages || [])
+  }
+
+  async function sendWorldBuilder() {
+    if (!wbInput.trim() || !activeWorldId || wbLoading) return
+    const userMsg = wbInput.trim()
+    setWbInput('')
+    setWbLoading(true)
+    const newHistory = [...wbMessages, { role: 'user', content: userMsg }]
+    setWbMessages(newHistory)
+
+    const r = await fetch('/api/dm/worldbuilder', {
+      method: 'POST', headers: authH,
+      body: JSON.stringify({ worldId: activeWorldId, message: userMsg, history: wbMessages })
+    })
+    const d = await r.json()
+    if (d.reply) {
+      setWbMessages([...newHistory, { role: 'assistant', content: d.reply }])
+      setWbLastExchange({ user: userMsg, assistant: d.reply })
+      setWbPreview(null)
+      setWbSaveMsg('')
+    }
+    setWbLoading(false)
+  }
+
+  async function previewCommit() {
+    if (!wbLastExchange || !activeWorldId) return
+    setWbPreviewLoading(true)
+    setWbPreview(null)
+    const r = await fetch('/api/dm/commit-lore', {
+      method: 'POST', headers: authH,
+      body: JSON.stringify({
+        worldId: activeWorldId,
+        lastUserMessage: wbLastExchange.user,
+        lastAssistantMessage: wbLastExchange.assistant
+      })
+    })
+    const d = await r.json()
+    if (d.preview) setWbPreview(d.preview)
+    setWbPreviewLoading(false)
+  }
+
+  async function saveLore() {
+    if (!wbPreview || !activeWorldId) return
+    setWbSaving(true)
+    const r = await fetch('/api/dm/commit-lore', {
+      method: 'POST', headers: authH,
+      body: JSON.stringify({
+        worldId: activeWorldId,
+        action: 'save',
+        previewData: wbPreview
+      })
+    })
+    const d = await r.json()
+    if (d.success) {
+      setCanonText(d.canonText)
+      setWbSaveMsg('✓ Lore committed to world canon!')
+      setWbPreview(null)
+      setWbLastExchange(null)
+      await loadWorlds()
+    }
+    setWbSaving(false)
   }
 
   const activeWorld = worlds.find(w => w.id === activeWorldId)
@@ -294,6 +366,7 @@ export default function DMPortal() {
 
   const TABS = [
     { id: 'world', label: '📜 World' },
+    { id: 'builder', label: '✨ World Builder' },
     { id: 'players', label: '⚔ Players' },
     { id: 'parties', label: '🛡 Parties' },
     { id: 'knowledge', label: '🧠 Knowledge' },
