@@ -53,8 +53,12 @@ export default function MapPage() {
     const d = await r.json()
     setWorlds(d.worlds || [])
     if (d.worlds?.length) {
-      setWorldId(d.worlds[0].id)
-      setMapImageUrl(d.worlds[0].map_image_url || '')
+      const params = new URLSearchParams(window.location.search)
+      const requestedId = params.get('worldId')
+      const target = requestedId ? d.worlds.find((w: any) => w.id === requestedId) : d.worlds[0]
+      const w = target || d.worlds[0]
+      setWorldId(w.id)
+      setMapImageUrl(w.map_image_url || '')
     }
   }
 
