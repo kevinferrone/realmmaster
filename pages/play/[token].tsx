@@ -202,6 +202,9 @@ export default function PlayerPortal() {
           <div style={{ display: 'flex', gap: 4 }}>
             <button style={{ ...s.tab, ...(tab === 'setup' ? s.tabActive : {}) }} onClick={() => setTab('setup')}>🧙 Character</button>
             <button style={{ ...s.tab, ...(tab === 'chat' ? s.tabActive : {}) }} onClick={() => setTab('chat')}>💬 Chat</button>
+            <a href={`/world-map?token=${token}`} style={{ textDecoration: 'none' }}>
+              <button style={s.tab}>🗺 Map</button>
+            </a>
           </div>
           <div style={{ textAlign: 'right' as any }}>
             <div style={{ fontSize: 13, color: '#c9933a' }}>{world?.name}</div>
