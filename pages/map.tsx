@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import Head from 'next/head'
 import { getSupabaseBrowser } from '../lib/supabase'
 
-const MAP_IMAGE = 'https://wrhhnnpfmszljpxitcrg.supabase.co/storage/v1/object/public/maps/Sorasula_Map_copy.jpg'
 
 function useAuth() {
   const [session, setSession] = useState<any>(null)
@@ -20,6 +19,7 @@ export default function MapPage() {
   const { session, loading } = useAuth()
   const [worldId, setWorldId] = useState<string | null>(null)
   const [worlds, setWorlds] = useState<any[]>([])
+  const [mapImageUrl, setMapImageUrl] = useState<string>('')
   const [locations, setLocations] = useState<any[]>([])
   const [reveals, setReveals] = useState<any[]>([])
   const [players, setPlayers] = useState<any[]>([])
@@ -52,7 +52,10 @@ export default function MapPage() {
     const r = await fetch('/api/dm/worlds', { headers: authH })
     const d = await r.json()
     setWorlds(d.worlds || [])
-    if (d.worlds?.length) setWorldId(d.worlds[0].id)
+    if (d.worlds?.length) {
+      setWorldId(d.worlds[0].id)
+      setMapImageUrl(d.worlds[0].map_image_url || '')
+    }
   }
 
   async function loadMap() {
@@ -161,7 +164,11 @@ export default function MapPage() {
           </a>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             {worlds.length > 1 && (
-              <select style={s.select} value={worldId || ''} onChange={e => setWorldId(e.target.value)}>
+              <select style={s.select} value={worldId || ''} onChange={e => {
+                setWorldId(e.target.value)
+                const w = worlds.find(x => x.id === e.target.value)
+                setMapImageUrl(w?.map_image_url || '')
+              }}>
                 {worlds.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
               </select>
             )}
@@ -182,7 +189,10 @@ export default function MapPage() {
             )}
             <div ref={mapRef} style={{ ...s.mapContainer, cursor: addingPin ? 'crosshair' : 'default' }}
               onClick={handleMapClick}>
-              <img src={MAP_IMAGE} alt="Sorasula" style={s.mapImg} draggable={false} />
+              {mapImageUrl
+                ? <img src={mapImageUrl} alt="World Map" style={s.mapImg} draggable={false} />
+                : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#5a4a30', fontStyle: 'italic' }}>No map image set. Add a map URL in the World tab.</div>
+              }
 
               {/* Existing pins */}
               {locations.map(loc => {
