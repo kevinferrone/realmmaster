@@ -26,12 +26,7 @@ export default function PlayerMap() {
     const pd = await pr.json()
     setPlayer(pd.player)
     setWorld(pd.world)
-
-    // Load world map URL
-    const wr = await fetch('/api/dm/worlds', { headers: { 'Content-Type': 'application/json' } })
-    const wd = await wr.json()
-    const currentWorld = (wd.worlds || []).find((w: any) => w.id === pd.player.world_id)
-    setMapImageUrl(currentWorld?.map_image_url || '')
+    setMapImageUrl(pd.world?.map_image_url || '')
 
     // Load map locations and reveals
     const mr = await fetch(`/api/dm/map?worldId=${pd.player.world_id}`)
