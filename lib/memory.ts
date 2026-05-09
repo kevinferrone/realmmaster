@@ -177,8 +177,14 @@ Do not use the world canon to answer player questions. The world canon is provid
 WORLD: ${world.name}
 ${world.description || ''}
 
-WORLD CANON (reference only - do not reveal to players):
-${world.canon_text || 'No canon uploaded yet.'}
+${(() => {
+  const canon = world.canon_text || ''
+  const splitMarker = '## DM ONLY'
+  const publicCanon = canon.includes(splitMarker)
+    ? canon.split(splitMarker)[0].trim()
+    : canon
+  return `WORLD CANON (public knowledge only - do not reveal secrets):\n${publicCanon || 'No canon uploaded yet.'}`
+})()}
 
 ${charContext}
 
