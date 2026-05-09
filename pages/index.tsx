@@ -85,6 +85,7 @@ export default function DMPortal() {
   const [worldName, setWorldName] = useState('')
   const [worldDesc, setWorldDesc] = useState('')
   const [worldMap, setWorldMap] = useState('')
+  const [mapUploading, setMapUploading] = useState(false)
   const [canonText, setCanonText] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
@@ -349,8 +350,36 @@ export default function DMPortal() {
                   <input style={s.input} value={worldName} onChange={e => setWorldName(e.target.value)} placeholder="e.g. Sorasula" />
                   <label style={s.label}>Description</label>
                   <textarea style={{ ...s.input, height: 64, resize: 'vertical' as any }} value={worldDesc} onChange={e => setWorldDesc(e.target.value)} placeholder="Brief description for the AI DM..." />
-                <label style={s.label}>Map Image URL</label>
-                  <input style={s.input} value={worldMap} onChange={e => setWorldMap(e.target.value)} placeholder="https://... (Supabase storage URL for this world's map)" />
+                <label style={s.label}>World Map Image</label>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+                    <input style={{ ...s.input, margin: 0, flex: 1 }} value={worldMap} onChange={e => setWorldMap(e.target.value)} placeholder="Map image URL (auto-filled on upload)" />
+                    <button style={s.btnSm} onClick={() => document.getElementById('mapUpload')?.click()}>
+                      {mapUploading ? 'Uploading...' : '📎 Upload'}
+                    </button>
+                    <input type="file" id="mapUpload" accept="image/*" style={{ display: 'none' }}
+                      onChange={async e => {
+                        const file = e.target.files?.[0]
+                        if (!file || !activeWorldId) return
+                        setMapUploading(true)
+                        const form = new FormData()
+                        form.append('worldId', activeWorldId)
+                        form.append('file', file)
+                        const r = await fetch('/api/dm/upload-map', {
+                          method: 'POST',
+                          headers: { Authorization: `Bearer ${token}` },
+                          body: form
+                        })
+                        const d = await r.json()
+                        if (d.url) {
+                          setWorldMap(d.url)
+                          setSaveMsg('✓ Map uploaded!')
+                        } else {
+                          setSaveMsg('Error uploading map: ' + d.error)
+                        }
+                        setMapUploading(false)
+                      }} />
+                  </div>
+                  {worldMap && <img src={worldMap} alt="Map preview" style={{ width: '100%', borderRadius: 6, border: '1px solid rgba(201,147,58,0.2)', marginBottom: 10 }} />}
                 </div>
                 <div style={s.card}>
                   <div style={s.cardTitle}>📊 Campaign Stats</div>
