@@ -84,6 +84,7 @@ export default function DMPortal() {
   const [activeWorldId, setActiveWorldId] = useState<string | null>(null)
   const [worldName, setWorldName] = useState('')
   const [worldDesc, setWorldDesc] = useState('')
+  const [worldMap, setWorldMap] = useState('')
   const [canonText, setCanonText] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
@@ -129,7 +130,7 @@ export default function DMPortal() {
     setWorlds(d.worlds || [])
     if (d.worlds?.length && !activeWorldId) {
       const w = d.worlds[0]
-      setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || ''); setCanonText(w.canon_text || '')
+      setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || ''); setCanonText(w.canon_text || ''); setWorldMap(w.map_image_url || '')
     }
   }
 
@@ -137,10 +138,10 @@ export default function DMPortal() {
     setSaving(true); setSaveMsg('')
     if (!worldName.trim()) { setSaveMsg('World name required'); setSaving(false); return }
     if (activeWorldId) {
-      await fetch('/api/dm/worlds', { method: 'PATCH', headers: authH, body: JSON.stringify({ worldId: activeWorldId, name: worldName, description: worldDesc, canonText: canonText || undefined }) })
+      await fetch('/api/dm/worlds', { method: 'PATCH', headers: authH, body: JSON.stringify({ worldId: activeWorldId, name: worldName, description: worldDesc, canonText: canonText || undefined, mapImageUrl: worldMap || undefined }) })
       setSaveMsg('✓ Saved')
     } else {
-      const r = await fetch('/api/dm/worlds', { method: 'POST', headers: authH, body: JSON.stringify({ name: worldName, description: worldDesc, canonText }) })
+      const r = await fetch('/api/dm/worlds', { method: 'POST', headers: authH, body: JSON.stringify({ name: worldName, description: worldDesc, canonText, mapImageUrl: worldMap }) })
       const d = await r.json()
       setActiveWorldId(d.world.id)
       setSaveMsg('✓ World created')
@@ -337,7 +338,7 @@ export default function DMPortal() {
                       <select style={s.select} value={activeWorldId || ''}
                         onChange={e => {
                           if (e.target.value === 'new') { setActiveWorldId(null); setWorldName(''); setWorldDesc(''); setCanonText('') }
-                          else { setActiveWorldId(e.target.value); const w = worlds.find(x => x.id === e.target.value); if (w) { setWorldName(w.name); setWorldDesc(w.description || ''); setCanonText(w.canon_text || '') } }
+                          else { setActiveWorldId(e.target.value); const w = worlds.find(x => x.id === e.target.value); if (w) { setWorldName(w.name); setWorldDesc(w.description || ''); setCanonText(w.canon_text || ''); setWorldMap(w.map_image_url || '') } }
                         }}>
                         {worlds.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                         <option value="new">+ New world</option>
@@ -348,6 +349,8 @@ export default function DMPortal() {
                   <input style={s.input} value={worldName} onChange={e => setWorldName(e.target.value)} placeholder="e.g. Sorasula" />
                   <label style={s.label}>Description</label>
                   <textarea style={{ ...s.input, height: 64, resize: 'vertical' as any }} value={worldDesc} onChange={e => setWorldDesc(e.target.value)} placeholder="Brief description for the AI DM..." />
+                <label style={s.label}>Map Image URL</label>
+                  <input style={s.input} value={worldMap} onChange={e => setWorldMap(e.target.value)} placeholder="https://... (Supabase storage URL for this world's map)" />
                 </div>
                 <div style={s.card}>
                   <div style={s.cardTitle}>📊 Campaign Stats</div>
