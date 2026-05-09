@@ -21,9 +21,12 @@ export default function MapPage() {
   const [worlds, setWorlds] = useState<any[]>([])
   const [mapImageUrl, setMapImageUrl] = useState<string>('')
   const [locations, setLocations] = useState<any[]>([])
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [dragOffset, setDragOffset] = useState<{ x: number, y: number }>({ x: 0, y: 0 })
   const [reveals, setReveals] = useState<any[]>([])
   const [players, setPlayers] = useState<any[]>([])
   const [parties, setParties] = useState<any[]>([])
+  
 
   const [selectedPin, setSelectedPin] = useState<any>(null)
   const [addingPin, setAddingPin] = useState(false)
@@ -191,8 +194,27 @@ export default function MapPage() {
             {addingPin && (
               <div style={s.addingBanner}>Click anywhere on the map to place a pin</div>
             )}
-            <div ref={mapRef} style={{ ...s.mapContainer, cursor: addingPin ? 'crosshair' : 'default' }}
-              onClick={handleMapClick}>
+            <div ref={mapRef} style={{ ...s.mapContainer, cursor: addingPin ? 'crosshair' : draggingId ? 'grabbing' : 'default' }}
+              onClick={handleMapClick}
+              onMouseMove={e => {
+                if (!draggingId || !mapRef.current) return
+                const rect = mapRef.current.getBoundingClientRect()
+                const x = Math.min(100, Math.max(0, ((e.clientX - rect.left - dragOffset.x) / rect.width) * 100))
+                const y = Math.min(100, Math.max(0, ((e.clientY - rect.top - dragOffset.y) / rect.height) * 100))
+                setLocations(prev => prev.map(l => l.id === draggingId ? { ...l, x_percent: x, y_percent: y } : l))
+              }}
+              onMouseUp={async e => {
+                if (!draggingId) return
+                const rect = mapRef.current!.getBoundingClientRect()
+                const x = Math.min(100, Math.max(0, ((e.clientX - rect.left - dragOffset.x) / rect.width) * 100))
+                const y = Math.min(100, Math.max(0, ((e.clientY - rect.top - dragOffset.y) / rect.height) * 100))
+                await fetch('/api/dm/map', {
+                  method: 'PATCH', headers: authH,
+                  body: JSON.stringify({ locationId: draggingId, xPercent: x, yPercent: y })
+                })
+                setDraggingId(null)
+              }}
+              onMouseLeave={() => setDraggingId(null)}>
               {mapImageUrl
                 ? <img src={mapImageUrl} alt="World Map" style={s.mapImg} draggable={false} />
                 : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#5a4a30', fontStyle: 'italic' }}>No map image set. Add a map URL in the World tab.</div>
@@ -202,10 +224,18 @@ export default function MapPage() {
               {locations.map(loc => {
                 const revealCount = getRevealedPlayerCount(loc.id)
                 const isSelected = selectedPin?.id === loc.id
+                const isDragging = draggingId === loc.id
                 return (
                   <div key={loc.id}
-                    style={{ ...s.pin, left: `${loc.x_percent}%`, top: `${loc.y_percent}%`, ...(isSelected ? s.pinSelected : {}) }}
+                    style={{
+                      ...s.pin,
+                      left: `${loc.x_percent}%`,
+                      top: `${loc.y_percent}%`,
+                      ...(isSelected ? s.pinSelected : {}),
+                      ...(isDragging ? { opacity: 0.7, cursor: 'grabbing' } : { cursor: 'grab' })
+                    }}
                     onClick={e => {
+                      if (draggingId) return
                       e.stopPropagation()
                       setSelectedPin(loc)
                       setEditingPin(false)
@@ -213,6 +243,19 @@ export default function MapPage() {
                       setEditLore(loc.lore || '')
                       setRevealMsg('')
                       setNewPinPos(null)
+                    }}
+                    onMouseDown={e => {
+                      if (addingPin) return
+                      e.stopPropagation()
+                      e.preventDefault()
+                      const rect = mapRef.current!.getBoundingClientRect()
+                      const pinX = (loc.x_percent / 100) * rect.width
+                      const pinY = (loc.y_percent / 100) * rect.height
+                      setDragOffset({
+                        x: e.clientX - rect.left - pinX,
+                        y: e.clientY - rect.top - pinY
+                      })
+                      setDraggingId(loc.id)
                     }}>
                     <div style={s.pinDot} />
                     <div style={s.pinLabel}>
