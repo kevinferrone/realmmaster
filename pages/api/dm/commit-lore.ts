@@ -27,15 +27,12 @@ function appendToSection(canonText: string, section: string, newContent: string)
   const sectionIndex = text.indexOf(section)
   if (sectionIndex === -1) return text + `\n\n${section}\n${newContent}`
 
-  // Find where this section ends (next section starts)
   const afterSection = text.slice(sectionIndex + section.length)
   const nextSectionMatch = afterSection.search(/\n## /)
-  
+
   if (nextSectionMatch === -1) {
-    // This is the last section — append at end
     return text + `\n${newContent}`
   } else {
-    // Insert before the next section
     const insertPoint = sectionIndex + section.length + nextSectionMatch
     return text.slice(0, insertPoint) + `\n${newContent}` + text.slice(insertPoint)
   }
@@ -47,7 +44,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const db = getSupabaseAdmin()
 
-  // POST: extract lore from last exchange and return preview
   if (req.method === 'POST') {
     const { worldId, lastUserMessage, lastAssistantMessage, action, previewData } = req.body
     if (!worldId) return res.status(400).json({ error: 'worldId required' })
@@ -60,7 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .single()
     if (!world) return res.status(403).json({ error: 'Forbidden' })
 
-    // If action is 'save', apply the previewed lore to canon
+    // Save previewed lore to canon
     if (action === 'save' && previewData) {
       let updatedCanon = world.canon_text || ''
       for (const entry of previewData) {
@@ -73,11 +69,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.json({ success: true, canonText: updatedCanon })
     }
 
-    // Otherwise extract lore from the exchange
-    const extractionPrompt = `You are extracting world-building lore from a conversation between a DM and their world-building assistant.
+    // Extract lore from the last exchange
+    if (!lastUserMessage || !lastAssistantMessage) {
+      return res.status(400).json({ error: 'lastUserMessage and lastAssistantMessage required' })
+    }
+
+    const extractionResponse = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY!,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 1024,
+        messages: [{
+          role: 'user',
+          content: `You are extracting world-building lore from a conversation to add to a D&D world canon.
 
 AVAILABLE CANON SECTIONS:
 ${CANON_SECTIONS.join('\n')}
 
-THE EXCHANGE TO EXTRACT FROM:
+THE EXCHANGE:
 DM: ${lastUserMessage}
