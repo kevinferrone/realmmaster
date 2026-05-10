@@ -401,107 +401,191 @@ async function loadLogs() {
           {tab === 'worlds' && (
             <div>
               <h1 style={s.pageTitle}>Worlds</h1>
-              <p style={s.pageSub}>Manage your world settings, canon, and build new lore with Claude.</p>
+              <p style={s.pageSub}>Manage your world settings and canon. Chat with Peekaboo to build new lore.</p>
               {!activeWorldId && <div style={s.warning}>⚠ Create a world first.</div>}
 
-              {/* Row 1: World Settings + World Builder Chat */}
               <div style={s.grid2}>
-                <div style={s.card}>
-                  <div style={s.cardTitle}>🌍 World Settings</div>
-                  {worlds.length > 0 && (
-                    <>
-                      <label style={s.label}>Active World</label>
-                      <select style={s.select} value={activeWorldId || ''}
-                        onChange={e => {
-                          if (e.target.value === 'new') { setActiveWorldId(null); setWorldName(''); setWorldDesc(''); setCanonText('') }
-                          else { setActiveWorldId(e.target.value); const w = worlds.find(x => x.id === e.target.value); if (w) { setWorldName(w.name); setWorldDesc(w.description || ''); setCanonText(w.canon_text || ''); setWorldMap(w.map_image_url || '') } }
-                        }}>
-                        {worlds.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                        <option value="new">+ New world</option>
-                      </select>
-                    </>
-                  )}
-                  <label style={s.label}>World Name</label>
-                  <input style={s.input} value={worldName} onChange={e => setWorldName(e.target.value)} placeholder="e.g. Sorasula" />
-                  <label style={s.label}>Description</label>
-                  <textarea style={{ ...s.input, height: 64, resize: 'vertical' as any }} value={worldDesc} onChange={e => setWorldDesc(e.target.value)} placeholder="Brief description for the AI DM..." />
-                  <label style={s.label}>World Map Image</label>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
-                    <input style={{ ...s.input, margin: 0, flex: 1 }} value={worldMap} onChange={e => setWorldMap(e.target.value)} placeholder="Map image URL (auto-filled on upload)" />
-                    <button style={s.btnSm} onClick={() => document.getElementById('mapUpload')?.click()}>
-                      {mapUploading ? 'Uploading...' : '📎 Upload'}
-                    </button>
-                    <input type="file" id="mapUpload" accept="image/*" style={{ display: 'none' }}
-                      onChange={async e => {
-                        const file = e.target.files?.[0]
-                        if (!file || !activeWorldId) return
-                        setMapUploading(true)
-                        const form = new FormData()
-                        form.append('worldId', activeWorldId)
-                        form.append('file', file)
-                        const r = await fetch('/api/dm/upload-map', {
-                          method: 'POST',
-                          headers: { Authorization: `Bearer ${token}` },
-                          body: form
-                        })
-                        const d = await r.json()
-                        if (d.url) {
-                          setWorldMap(d.url)
-                          setSaveMsg('✓ Map uploaded!')
-                        } else {
-                          setSaveMsg('Error uploading map: ' + d.error)
-                        }
-                        setMapUploading(false)
-                      }} />
+
+                {/* LEFT COLUMN: World Settings → World Stats → Canon Sections */}
+                <div>
+                  <div style={s.card}>
+                    <div style={s.cardTitle}>🌍 World Settings</div>
+                    {worlds.length > 0 && (
+                      <>
+                        <label style={s.label}>Active World</label>
+                        <select style={s.select} value={activeWorldId || ''}
+                          onChange={e => {
+                            if (e.target.value === 'new') { setActiveWorldId(null); setWorldName(''); setWorldDesc(''); setCanonText('') }
+                            else { setActiveWorldId(e.target.value); const w = worlds.find(x => x.id === e.target.value); if (w) { setWorldName(w.name); setWorldDesc(w.description || ''); setCanonText(w.canon_text || ''); setWorldMap(w.map_image_url || '') } }
+                          }}>
+                          {worlds.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                          <option value="new">+ New world</option>
+                        </select>
+                      </>
+                    )}
+                    <label style={s.label}>World Name</label>
+                    <input style={s.input} value={worldName} onChange={e => setWorldName(e.target.value)} placeholder="e.g. Sorasula" />
+                    <label style={s.label}>Description</label>
+                    <textarea style={{ ...s.input, height: 64, resize: 'vertical' as any }} value={worldDesc} onChange={e => setWorldDesc(e.target.value)} placeholder="Brief description for the AI DM..." />
+                    <label style={s.label}>World Map Image</label>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+                      <input style={{ ...s.input, margin: 0, flex: 1 }} value={worldMap} onChange={e => setWorldMap(e.target.value)} placeholder="Map image URL (auto-filled on upload)" />
+                      <button style={s.btnSm} onClick={() => document.getElementById('mapUpload')?.click()}>
+                        {mapUploading ? 'Uploading...' : '📎 Upload'}
+                      </button>
+                      <input type="file" id="mapUpload" accept="image/*" style={{ display: 'none' }}
+                        onChange={async e => {
+                          const file = e.target.files?.[0]
+                          if (!file || !activeWorldId) return
+                          setMapUploading(true)
+                          const form = new FormData()
+                          form.append('worldId', activeWorldId)
+                          form.append('file', file)
+                          const r = await fetch('/api/dm/upload-map', {
+                            method: 'POST',
+                            headers: { Authorization: `Bearer ${token}` },
+                            body: form
+                          })
+                          const d = await r.json()
+                          if (d.url) {
+                            setWorldMap(d.url)
+                            setSaveMsg('✓ Map uploaded!')
+                          } else {
+                            setSaveMsg('Error uploading map: ' + d.error)
+                          }
+                          setMapUploading(false)
+                        }} />
+                    </div>
+                    {worldMap && <img src={worldMap} alt="Map preview" style={{ width: '100%', borderRadius: 6, border: '1px solid rgba(201,147,58,0.2)', marginBottom: 10 }} />}
+                    <div style={{ display: 'flex', gap: 10, marginTop: 4, alignItems: 'center' }}>
+                      <button style={s.btnPrimary} onClick={saveWorld} disabled={saving}>
+                        {saving ? 'Saving...' : activeWorldId ? '💾 Save World' : '✨ Create World'}
+                      </button>
+                      {saveMsg && <span style={{ fontSize: 13, color: saveMsg.startsWith('✓') ? '#5aaa5a' : '#c04040' }}>{saveMsg}</span>}
+                    </div>
                   </div>
-                  {worldMap && <img src={worldMap} alt="Map preview" style={{ width: '100%', borderRadius: 6, border: '1px solid rgba(201,147,58,0.2)', marginBottom: 10 }} />}
-                  <div style={{ display: 'flex', gap: 10, marginTop: 4, alignItems: 'center' }}>
-                    <button style={s.btnPrimary} onClick={saveWorld} disabled={saving}>
-                      {saving ? 'Saving...' : activeWorldId ? '💾 Save World' : '✨ Create World'}
-                    </button>
-                    {saveMsg && <span style={{ fontSize: 13, color: saveMsg.startsWith('✓') ? '#5aaa5a' : '#c04040' }}>{saveMsg}</span>}
+
+                  <div style={{ ...s.card, marginTop: 14 }}>
+                    <div style={s.cardTitle}>📊 World Stats</div>
+                    {activeWorldId ? (
+                      <>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                          <div style={s.statBox}><div style={s.statVal}>{players.length}</div><div style={s.statLabel}>Players</div></div>
+                          <div style={s.statBox}><div style={s.statVal}>{parties.length}</div><div style={s.statLabel}>Parties</div></div>
+                        </div>
+                        {activeWorld && <p style={{ fontSize: 12, color: '#5a4a30', marginTop: 14, fontStyle: 'italic' }}>Last updated: {new Date(activeWorld.updated_at).toLocaleDateString()}</p>}
+                      </>
+                    ) : (
+                      <p style={s.empty}>Select a world to see its stats.</p>
+                    )}
+                  </div>
+
+                  <div style={{ ...s.card, marginTop: 14 }}>
+                    <div style={s.cardTitle}>📜 Canon Sections</div>
+                    {canonText ? (
+                      <div>
+                        {['## GEOGRAPHY & LOCATIONS', '## FACTIONS & ORGANIZATIONS', '## NPCS & CHARACTERS', '## HISTORY & TIMELINE', '## MAGIC & MECHANICS', '## CULTURE & SOCIETY', '## DM ONLY — SECRETS & MYSTERIES'].map(section => (
+                          <div key={section} style={{ display: 'flex', padding: '5px 0', borderBottom: '1px solid rgba(201,147,58,0.08)', fontSize: 12 }}>
+                            <span style={{ color: canonText.includes(section) ? '#e8b86d' : '#5a4a30' }}>
+                              {canonText.includes(section) ? '✓' : '○'} {section.replace('## ', '')}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p style={s.empty}>No canon yet. Start chatting to build your world.</p>
+                    )}
                   </div>
                 </div>
+
+                {/* RIGHT COLUMN: Peekaboo chat → commit buttons → lore preview */}
                 <div>
-                  <div style={{ ...s.card, display: 'flex', flexDirection: 'column', height: 520 }}>
-                    <div style={s.cardTitle}>💬 World Building Chat</div>
+                  <div style={{ ...s.card, display: 'flex', flexDirection: 'column', height: 460 }}>
+                    {/* Peekaboo header */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid rgba(201,147,58,0.12)' }}>
+                      <svg width="56" height="68" viewBox="0 0 56 68" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+                        {/* Breastplate */}
+                        <rect x="6" y="46" width="44" height="22" rx="3" fill="#7a8fa0"/>
+                        <rect x="10" y="43" width="36" height="16" rx="3" fill="#8fa3b5"/>
+                        {/* Pauldrons */}
+                        <ellipse cx="8" cy="46" rx="8" ry="6" fill="#6a7f90"/>
+                        <ellipse cx="48" cy="46" rx="8" ry="6" fill="#6a7f90"/>
+                        {/* Armor highlights */}
+                        <line x1="28" y1="50" x2="28" y2="66" stroke="#adc4d4" strokeWidth="1" opacity="0.4"/>
+                        <path d="M 14 46 Q 28 44 42 46" stroke="#adc4d4" strokeWidth="1" fill="none" opacity="0.4"/>
+                        {/* Gorget */}
+                        <rect x="18" y="39" width="20" height="10" rx="2" fill="#9fb3c2"/>
+                        {/* Neck */}
+                        <rect x="22" y="34" width="12" height="8" fill="#c8936a"/>
+                        {/* Head */}
+                        <ellipse cx="28" cy="26" rx="16" ry="16" fill="#c8936a"/>
+                        {/* Pink beard - sides */}
+                        <ellipse cx="14" cy="32" rx="7" ry="9" fill="#e0609a"/>
+                        <ellipse cx="42" cy="32" rx="7" ry="9" fill="#e0609a"/>
+                        {/* Pink beard - chin */}
+                        <ellipse cx="28" cy="37" rx="13" ry="8" fill="#e0609a"/>
+                        {/* Mustache */}
+                        <ellipse cx="28" cy="30" rx="9" ry="3.5" fill="#c84d88"/>
+                        {/* Eyes */}
+                        <circle cx="22" cy="22" r="2.5" fill="#1a0e08"/>
+                        <circle cx="34" cy="22" r="2.5" fill="#1a0e08"/>
+                        {/* Eye shine */}
+                        <circle cx="23" cy="21" r="0.9" fill="white"/>
+                        <circle cx="35" cy="21" r="0.9" fill="white"/>
+                        {/* Nose */}
+                        <ellipse cx="28" cy="27" rx="2.5" ry="1.8" fill="#b07a52"/>
+                        {/* Smile */}
+                        <path d="M 22 32 Q 28 36 34 32" stroke="#8a3a3a" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+                        {/* Rosy cheeks */}
+                        <circle cx="17" cy="27" r="4" fill="#e8a0a0" opacity="0.35"/>
+                        <circle cx="39" cy="27" r="4" fill="#e8a0a0" opacity="0.35"/>
+                      </svg>
+                      <div>
+                        <div style={s.cardTitle}>💬 Chat with Peekaboo</div>
+                        <div style={{ fontSize: 11, color: '#7a6a50', fontStyle: 'italic', marginTop: -8 }}>Your world-building companion</div>
+                      </div>
+                    </div>
+                    {/* Messages */}
                     <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12 }}>
                       {wbMessages.length === 0 && (
                         <div style={{ padding: '20px 0', textAlign: 'center' as any }}>
                           <p style={{ fontSize: 13, color: '#7a6a50', fontStyle: 'italic' }}>
-                            Start by telling Claude about your world. What is the setting? What makes it unique? What are you trying to build?
+                            Start by telling Peekaboo about your world. What's the setting? What makes it unique? What are you trying to build?
                           </p>
                         </div>
                       )}
                       {wbMessages.map((m, i) => (
                         <div key={i} style={{ display: 'flex', gap: 8, flexDirection: m.role === 'user' ? 'row-reverse' : 'row', alignItems: 'flex-start' }}>
-                          <div style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, background: m.role === 'user' ? 'rgba(201,147,58,0.15)' : '#1a3a1a', border: `1px solid ${m.role === 'user' ? 'rgba(201,147,58,0.3)' : 'rgba(58,122,58,0.4)'}`, color: m.role === 'user' ? '#e8b86d' : '#5aaa5a' }}>
-                            {m.role === 'user' ? 'DM' : 'AI'}
+                          <div style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, background: m.role === 'user' ? 'rgba(201,147,58,0.15)' : 'rgba(224,96,154,0.15)', border: `1px solid ${m.role === 'user' ? 'rgba(201,147,58,0.3)' : 'rgba(224,96,154,0.4)'}`, color: m.role === 'user' ? '#e8b86d' : '#e0609a' }}>
+                            {m.role === 'user' ? 'DM' : 'PB'}
                           </div>
-                          <div style={{ maxWidth: '80%', padding: '10px 14px', borderRadius: 10, fontSize: 13, lineHeight: 1.7, background: m.role === 'user' ? 'rgba(201,147,58,0.09)' : '#1a1206', border: `1px solid ${m.role === 'user' ? 'rgba(201,147,58,0.2)' : 'rgba(58,122,58,0.2)'}`, color: '#e8dcc8', whiteSpace: 'pre-wrap' as any }}>
+                          <div style={{ maxWidth: '80%', padding: '10px 14px', borderRadius: 10, fontSize: 13, lineHeight: 1.7, background: m.role === 'user' ? 'rgba(201,147,58,0.09)' : '#1a1206', border: `1px solid ${m.role === 'user' ? 'rgba(201,147,58,0.2)' : 'rgba(224,96,154,0.15)'}`, color: '#e8dcc8', whiteSpace: 'pre-wrap' as any }}>
                             {m.content}
                           </div>
                         </div>
                       ))}
                       {wbLoading && (
                         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                          <div style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, background: '#1a3a1a', border: '1px solid rgba(58,122,58,0.4)', color: '#5aaa5a' }}>AI</div>
-                          <div style={{ padding: '10px 14px', borderRadius: 10, fontSize: 13, background: '#1a1206', border: '1px solid rgba(58,122,58,0.2)', color: '#5a4a30', fontStyle: 'italic' }}>Thinking...</div>
+                          <div style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, background: 'rgba(224,96,154,0.15)', border: '1px solid rgba(224,96,154,0.4)', color: '#e0609a' }}>PB</div>
+                          <div style={{ padding: '10px 14px', borderRadius: 10, fontSize: 13, background: '#1a1206', border: '1px solid rgba(224,96,154,0.15)', color: '#5a4a30', fontStyle: 'italic' }}>Thinking...</div>
                         </div>
                       )}
                     </div>
+                    {/* Input */}
                     <div style={{ display: 'flex', gap: 8 }}>
                       <textarea
                         style={{ ...s.input, margin: 0, flex: 1, height: 42, resize: 'none' as any }}
                         value={wbInput}
                         onChange={e => setWbInput(e.target.value)}
                         onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendWorldBuilder() } }}
-                        placeholder="Tell Claude about your world..."
+                        placeholder="Tell Peekaboo about your world..."
                         disabled={wbLoading || !activeWorldId}
                       />
                       <button style={{ ...s.btnSm, height: 42, padding: '0 14px' }} onClick={sendWorldBuilder} disabled={wbLoading || !activeWorldId}>➤</button>
                     </div>
                   </div>
+
+                  {/* Commit buttons — directly below chat */}
                   <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                     <button style={{ ...s.btnPrimary, flex: 1 }}
                       onClick={previewCommit}
@@ -512,46 +596,10 @@ async function loadLogs() {
                       Clear Chat
                     </button>
                   </div>
-                </div>
-              </div>{/* end row 1 grid */}
 
-              {/* Canon Text Editor */}
-              <div style={{ ...s.card, marginTop: 16 }}>
-                <div style={s.cardTitle}>📜 World Canon Text</div>
-                <p style={{ fontSize: 13, color: '#7a6a50', fontStyle: 'italic', marginBottom: 10 }}>
-                  Paste your world lore here. The AI DM reads all of this but only shares what each character would know.
-                </p>
-                <textarea style={{ ...s.input, height: 320, resize: 'vertical' as any, fontFamily: 'monospace', fontSize: 13 }}
-                  value={canonText} onChange={e => setCanonText(e.target.value)}
-                  placeholder="Paste your world canon here..." />
-                <div style={{ display: 'flex', gap: 10, marginTop: 10, alignItems: 'center' }}>
-                  <button style={s.btnPrimary} onClick={saveWorld} disabled={saving}>
-                    {saving ? 'Saving...' : activeWorldId ? '💾 Save Canon' : '✨ Create World'}
-                  </button>
-                  {saveMsg && <span style={{ fontSize: 13, color: saveMsg.startsWith('✓') ? '#5aaa5a' : '#c04040' }}>{saveMsg}</span>}
-                </div>
-              </div>
-
-              {/* Row 2: World Stats + Lore Preview */}
-              <div style={{ ...s.grid2, marginTop: 16 }}>
-                <div style={s.card}>
-                  <div style={s.cardTitle}>📊 World Stats</div>
-                  {activeWorldId ? (
-                    <>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                        <div style={s.statBox}><div style={s.statVal}>{players.length}</div><div style={s.statLabel}>Players</div></div>
-                        <div style={s.statBox}><div style={s.statVal}>{parties.length}</div><div style={s.statLabel}>Parties</div></div>
-                      </div>
-                      {activeWorld && <p style={{ fontSize: 12, color: '#5a4a30', marginTop: 14, fontStyle: 'italic' }}>Last updated: {new Date(activeWorld.updated_at).toLocaleDateString()}</p>}
-                    </>
-                  ) : (
-                    <p style={s.empty}>Select a world to see its stats.</p>
-                  )}
-                </div>
-
-                <div>
-                  {wbPreview && wbPreview.length > 0 ? (
-                    <div style={s.card}>
+                  {/* Lore Preview — directly below commit buttons */}
+                  {wbPreview && wbPreview.length > 0 && (
+                    <div style={{ ...s.card, marginTop: 10 }}>
                       <div style={s.cardTitle}>📋 Lore Preview</div>
                       <p style={{ fontSize: 12, color: '#7a6a50', fontStyle: 'italic', marginBottom: 14 }}>
                         Review what will be added to your world canon. Edit if needed, then commit.
@@ -573,32 +621,30 @@ async function loadLogs() {
                       </button>
                       {wbSaveMsg && <p style={{ fontSize: 13, color: '#5aaa5a', marginTop: 8 }}>{wbSaveMsg}</p>}
                     </div>
-                  ) : (
-                    <div style={{ ...s.card, display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, flexDirection: 'column', gap: 12 }}>
-                      {wbPreview && wbPreview.length === 0
-                        ? <p style={{ fontSize: 14, color: '#c04040', fontStyle: 'italic', textAlign: 'center' as any }}>No concrete lore found in that exchange. Keep chatting and try again.</p>
-                        : <p style={{ fontSize: 15, color: '#5a4a30', fontStyle: 'italic', textAlign: 'center' as any }}>Chat with Claude to develop lore, then click "Preview Lore Commit" to see what will be saved.</p>
-                      }
-                      {wbSaveMsg && <p style={{ fontSize: 13, color: '#5aaa5a' }}>{wbSaveMsg}</p>}
-                    </div>
                   )}
+                  {wbPreview && wbPreview.length === 0 && (
+                    <p style={{ fontSize: 13, color: '#c04040', fontStyle: 'italic', marginTop: 10, textAlign: 'center' as any }}>
+                      No concrete lore found in that exchange. Keep chatting and try again.
+                    </p>
+                  )}
+                  {wbSaveMsg && !wbPreview && <p style={{ fontSize: 13, color: '#5aaa5a', marginTop: 10 }}>{wbSaveMsg}</p>}
+                </div>
+              </div>
 
-                  <div style={{ ...s.card, marginTop: 14 }}>
-                    <div style={s.cardTitle}>📜 Current Canon Sections</div>
-                    {canonText ? (
-                      <div>
-                        {['## GEOGRAPHY & LOCATIONS', '## FACTIONS & ORGANIZATIONS', '## NPCS & CHARACTERS', '## HISTORY & TIMELINE', '## MAGIC & MECHANICS', '## CULTURE & SOCIETY', '## DM ONLY — SECRETS & MYSTERIES'].map(section => (
-                          <div key={section} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid rgba(201,147,58,0.08)', fontSize: 12 }}>
-                            <span style={{ color: canonText.includes(section) ? '#e8b86d' : '#5a4a30' }}>
-                              {canonText.includes(section) ? '✓' : '○'} {section.replace('## ', '')}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p style={s.empty}>No canon yet. Start chatting to build your world.</p>
-                    )}
-                  </div>
+              {/* Canon Text Editor — full width */}
+              <div style={{ ...s.card, marginTop: 16 }}>
+                <div style={s.cardTitle}>📜 World Canon Text</div>
+                <p style={{ fontSize: 13, color: '#7a6a50', fontStyle: 'italic', marginBottom: 10 }}>
+                  Paste your world lore here. The AI DM reads all of this but only shares what each character would know.
+                </p>
+                <textarea style={{ ...s.input, height: 320, resize: 'vertical' as any, fontFamily: 'monospace', fontSize: 13 }}
+                  value={canonText} onChange={e => setCanonText(e.target.value)}
+                  placeholder="Paste your world canon here..." />
+                <div style={{ display: 'flex', gap: 10, marginTop: 10, alignItems: 'center' }}>
+                  <button style={s.btnPrimary} onClick={saveWorld} disabled={saving}>
+                    {saving ? 'Saving...' : activeWorldId ? '💾 Save Canon' : '✨ Create World'}
+                  </button>
+                  {saveMsg && <span style={{ fontSize: 13, color: saveMsg.startsWith('✓') ? '#5aaa5a' : '#c04040' }}>{saveMsg}</span>}
                 </div>
               </div>
             </div>
