@@ -263,14 +263,39 @@ export default function MapPage() {
           <a href="/" style={{ textDecoration: 'none' }}>
             <div style={s.logo}>⚔ Realm<span style={{ color: '#c04040' }}>Master</span></div>
           </a>
+          <div style={{ display: 'flex', gap: 3 }}>
+            {[
+              { href: '/', label: '🌍 Worlds' },
+              { href: '/?tab=players', label: '🧙 Players' },
+              { href: '/?tab=knowledge', label: '🧠 Knowledge' },
+              { href: '/?tab=renown', label: '⭐ Renown' },
+              { href: '/?tab=logs', label: '📋 Logs' },
+            ].map(t => (
+              <a key={t.href} href={t.href} style={{ textDecoration: 'none' }}>
+                <button style={s.navTab}>{t.label}</button>
+              </a>
+            ))}
+          </div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             {worlds.length > 1 && (
-              <select style={s.select} value={worldId || ''} onChange={e => {
-                setWorldId(e.target.value)
-                const w = worlds.find(x => x.id === e.target.value)
-                setMapImageUrl(w?.map_image_url || '')
+              <select style={{ ...s.select, margin: 0, fontSize: 11, padding: '3px 8px' }} value={worldId || ''} onChange={e => {
+                const w = worlds.find((x: any) => x.id === e.target.value)
+                if (!w) return
+                setWorldId(w.id)
+                setMapImageUrl(w.map_image_url || '')
+                setCanonText(w.canon_text || '')
+                setSelectedPin(null)
+                setEditingPin(false)
+                setNewPinPos(null)
+                setAddingPin(false)
+                setLocMessages([])
+                setLocInput('')
+                setLocLastExchange(null)
+                setLocPinLore('')
+                setLocCanonPreview(null)
+                setLocCanonMsg('')
               }}>
-                {worlds.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                {worlds.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
               </select>
             )}
             <button
@@ -610,6 +635,7 @@ export default function MapPage() {
 const s: Record<string, React.CSSProperties> = {
   root: { background: '#0d0a07', minHeight: '100vh', color: '#e8dcc8', fontFamily: 'Georgia, serif', display: 'flex', flexDirection: 'column' },
   center: { background: '#0d0a07', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#c9933a', fontSize: 18 },
+  navTab: { background: 'transparent', border: 'none', color: '#9a8a70', padding: '6px 12px', borderRadius: 4, cursor: 'pointer', fontSize: 12, transition: 'color 0.15s' },
   nav: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 1.5rem', height: 60, borderBottom: '1px solid rgba(201,147,58,0.2)', background: 'rgba(13,10,7,0.95)', position: 'sticky', top: 0, zIndex: 100, flexShrink: 0 },
   logo: { fontSize: 20, fontWeight: 700, color: '#e8b86d' },
   layout: { display: 'flex', flex: 1, overflow: 'hidden', height: 'calc(100vh - 60px)' },
