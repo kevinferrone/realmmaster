@@ -4,16 +4,6 @@ import { getUserFromHeader } from '../../../lib/auth'
 
 const KNOWLEDGE_CATEGORIES = ['location', 'faction', 'npc', 'item', 'event', 'lore', 'secret']
 
-const CANON_SECTIONS = [
-  '## GEOGRAPHY & LOCATIONS',
-  '## FACTIONS & ORGANIZATIONS',
-  '## NPCS & CHARACTERS',
-  '## HISTORY & TIMELINE',
-  '## MAGIC & MECHANICS',
-  '## CULTURE & SOCIETY',
-  '## DM ONLY — SECRETS & MYSTERIES',
-]
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const user = await getUserFromHeader(req.headers.authorization || null)
   if (!user) return res.status(401).json({ error: 'Unauthorized' })
@@ -37,62 +27,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .map((p: any) => `- ${p.character_name || p.name}${p.character_class ? ` (${p.character_class})` : ''}`)
     .join('\n')
 
-  const systemPrompt = `You are Peekaboo, a world-building companion helping a Dungeon Master manage what their players know in the tabletop RPG world "${world.name}".
+  const systemPrompt = `You are Peekaboo, helping a Dungeon Master manage what their player characters know in the world "${world.name}".
 
-CRITICAL RULE — HONESTY ABOUT WHAT YOU CAN DO:
-You are a chat interface. You CANNOT directly write to the database, canon, or player knowledge ledgers. Nothing is saved until the DM reviews and approves it using the buttons that appear in the UI.
-- NEVER say "I've added X to the canon" or "I've granted Y knowledge" — you haven't, and saying so misleads the DM
-- NEVER say "I'll remember that" or "noted" as if you stored something — you haven't
-- ALWAYS present additions as proposals for the DM to review: "Here's what I'd add to canon — review and commit it using the panel below"
-- ALWAYS be explicit that the DM must click a button to actually save anything
+YOUR ONLY JOB HERE: Help the DM decide what knowledge to grant to players, then propose entries for their review.
 
-YOUR ACTUAL CAPABILITIES:
-1. Search the existing world canon and surface relevant information
-2. Propose knowledge entries to grant to players (DM must approve before anything is saved)
-3. Propose additions to world canon (DM must review and commit before anything is saved)
+WHAT YOU CAN DO:
+- Search the world canon and answer questions about locations, NPCs, factions, etc.
+- Propose player-facing knowledge entries for the DM to review and grant
+
+WHAT YOU CANNOT DO:
+- Add anything to world canon or lore — that is only possible in the Worlds tab or Map tab
+- If the DM asks to add to canon or world lore, tell them clearly: "To add to world canon, use the Worlds tab or the Map tab."
+- Never claim to have saved, stored, or added anything
 
 CURRENT PLAYERS:
 ${playerList || 'No players added yet.'}
 
-AVAILABLE KNOWLEDGE CATEGORIES: ${KNOWLEDGE_CATEGORIES.join(', ')}
+KNOWLEDGE CATEGORIES: ${KNOWLEDGE_CATEGORIES.join(', ')}
 
-CANON SECTIONS: ${CANON_SECTIONS.join(', ')}
-
-WORLD CANON:
+WORLD CANON (read-only reference):
 ${canonText}
 
-RESPONSE RULES:
-
-1. SEARCHING CANON: If the DM asks about something in the canon, answer directly and concisely from what is written.
-
-2. PROPOSING PLAYER KNOWLEDGE: If the DM wants to grant knowledge to players, include this block:
+WHEN PROPOSING KNOWLEDGE TO GRANT, include this block at the end of your reply:
 \`\`\`suggestions
 [
   {
     "category": "location",
-    "title": "Example Title",
-    "content": "What the character knows, written in-world from their perspective. 2-4 sentences."
+    "title": "Entry Title",
+    "content": "What the character knows, written from their in-world perspective. 2-4 sentences. No DM secrets."
   }
 ]
 \`\`\`
-Then say: "Review the suggestions in the panel and choose who to grant them to."
-Each entry should be player-appropriate — no DM secrets, written from the character's perspective.
+Then say: "Review the entries in the panel and choose who to grant them to."
 
-3. PROPOSING CANON ADDITIONS: If the DM wants to add something new to the world canon, include this block:
-\`\`\`canon
-[
-  {
-    "section": "## GEOGRAPHY & LOCATIONS",
-    "content": "The new lore to add to that canon section."
-  }
-]
-\`\`\`
-Then say: "Review the canon proposal in the panel and commit it to save."
-Use the most appropriate section from the CANON SECTIONS list above.
-
-4. BOTH AT ONCE: You can include both blocks in the same response if the DM wants to both add to canon and grant player knowledge simultaneously.
-
-5. AMBIGUITY: If the request is vague, ask one focused clarifying question before generating proposals.`
+If the request is vague, ask one clarifying question before proposing entries.`
 
   const messages = [
     ...(history || []),
@@ -108,7 +76,7 @@ Use the most appropriate section from the CANON SECTIONS list above.
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-5',
-      max_tokens: 1200,
+      max_tokens: 1000,
       system: systemPrompt,
       messages
     })
@@ -123,16 +91,7 @@ Use the most appropriate section from the CANON SECTIONS list above.
     try { suggestions = JSON.parse(suggestionsMatch[1].trim()) } catch {}
   }
 
-  const canonMatch = raw.match(/```canon\n([\s\S]*?)```/)
-  let canonProposal: any[] = []
-  if (canonMatch) {
-    try { canonProposal = JSON.parse(canonMatch[1].trim()) } catch {}
-  }
+  const reply = raw.replace(/```suggestions\n[\s\S]*?```/, '').trim()
 
-  const reply = raw
-    .replace(/```suggestions\n[\s\S]*?```/, '')
-    .replace(/```canon\n[\s\S]*?```/, '')
-    .trim()
-
-  return res.json({ reply, suggestions, canonProposal })
+  return res.json({ reply, suggestions })
 }
