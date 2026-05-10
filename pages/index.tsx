@@ -404,7 +404,7 @@ async function loadLogs() {
               <p style={s.pageSub}>Manage your world settings, canon, and build new lore with Claude.</p>
               {!activeWorldId && <div style={s.warning}>⚠ Create a world first.</div>}
 
-              {/* World Settings + Stats */}
+              {/* Row 1: World Settings + World Builder Chat */}
               <div style={s.grid2}>
                 <div style={s.card}>
                   <div style={s.cardTitle}>🌍 World Settings</div>
@@ -462,47 +462,6 @@ async function loadLogs() {
                     {saveMsg && <span style={{ fontSize: 13, color: saveMsg.startsWith('✓') ? '#5aaa5a' : '#c04040' }}>{saveMsg}</span>}
                   </div>
                 </div>
-                <div style={s.card}>
-                  <div style={s.cardTitle}>📊 Campaign Stats</div>
-                  <div style={s.statGrid}>
-                    <div style={s.statBox}><div style={s.statVal}>{worlds.length}</div><div style={s.statLabel}>Worlds</div></div>
-                    <div style={s.statBox}><div style={s.statVal}>{players.length}</div><div style={s.statLabel}>Players</div></div>
-                    <div style={s.statBox}><div style={s.statVal}>{totalMessages}</div><div style={s.statLabel}>Messages</div></div>
-                  </div>
-                  <div style={{ ...s.statGrid, marginTop: 8 }}>
-                    <div style={s.statBox}><div style={s.statVal}>{parties.length}</div><div style={s.statLabel}>Parties</div></div>
-                  </div>
-                  {activeWorld && <p style={{ fontSize: 12, color: '#5a4a30', marginTop: 12, fontStyle: 'italic' }}>Last updated: {new Date(activeWorld.updated_at).toLocaleDateString()}</p>}
-                </div>
-              </div>
-
-              {/* Canon Text Editor */}
-              <div style={{ ...s.card, marginTop: 16 }}>
-                <div style={s.cardTitle}>📜 World Canon Text</div>
-                <p style={{ fontSize: 13, color: '#7a6a50', fontStyle: 'italic', marginBottom: 10 }}>
-                  Paste your world lore here. The AI DM reads all of this but only shares what each character would know.
-                </p>
-                <textarea style={{ ...s.input, height: 320, resize: 'vertical' as any, fontFamily: 'monospace', fontSize: 13 }}
-                  value={canonText} onChange={e => setCanonText(e.target.value)}
-                  placeholder="Paste your world canon here..." />
-                <div style={{ display: 'flex', gap: 10, marginTop: 10, alignItems: 'center' }}>
-                  <button style={s.btnPrimary} onClick={saveWorld} disabled={saving}>
-                    {saving ? 'Saving...' : activeWorldId ? '💾 Save Canon' : '✨ Create World'}
-                  </button>
-                  {saveMsg && <span style={{ fontSize: 13, color: saveMsg.startsWith('✓') ? '#5aaa5a' : '#c04040' }}>{saveMsg}</span>}
-                </div>
-              </div>
-
-              {/* Divider */}
-              <div style={{ borderTop: '1px solid rgba(201,147,58,0.15)', margin: '28px 0 24px', position: 'relative' }}>
-                <span style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)', background: '#0d0a07', padding: '0 16px', fontSize: 11, color: '#5a4a30', letterSpacing: '0.15em', textTransform: 'uppercase' as any }}>
-                  World Builder
-                </span>
-              </div>
-              <p style={{ fontSize: 15, color: '#7a6a50', fontStyle: 'italic', marginBottom: 20 }}>Chat with Claude to develop your world lore. Commit anything worth keeping directly to your canon.</p>
-
-              {/* World Builder Chat + Lore Preview */}
-              <div style={s.grid2}>
                 <div>
                   <div style={{ ...s.card, display: 'flex', flexDirection: 'column', height: 520 }}>
                     <div style={s.cardTitle}>💬 World Building Chat</div>
@@ -553,6 +512,41 @@ async function loadLogs() {
                       Clear Chat
                     </button>
                   </div>
+                </div>
+              </div>{/* end row 1 grid */}
+
+              {/* Canon Text Editor */}
+              <div style={{ ...s.card, marginTop: 16 }}>
+                <div style={s.cardTitle}>📜 World Canon Text</div>
+                <p style={{ fontSize: 13, color: '#7a6a50', fontStyle: 'italic', marginBottom: 10 }}>
+                  Paste your world lore here. The AI DM reads all of this but only shares what each character would know.
+                </p>
+                <textarea style={{ ...s.input, height: 320, resize: 'vertical' as any, fontFamily: 'monospace', fontSize: 13 }}
+                  value={canonText} onChange={e => setCanonText(e.target.value)}
+                  placeholder="Paste your world canon here..." />
+                <div style={{ display: 'flex', gap: 10, marginTop: 10, alignItems: 'center' }}>
+                  <button style={s.btnPrimary} onClick={saveWorld} disabled={saving}>
+                    {saving ? 'Saving...' : activeWorldId ? '💾 Save Canon' : '✨ Create World'}
+                  </button>
+                  {saveMsg && <span style={{ fontSize: 13, color: saveMsg.startsWith('✓') ? '#5aaa5a' : '#c04040' }}>{saveMsg}</span>}
+                </div>
+              </div>
+
+              {/* Row 2: World Stats + Lore Preview */}
+              <div style={{ ...s.grid2, marginTop: 16 }}>
+                <div style={s.card}>
+                  <div style={s.cardTitle}>📊 World Stats</div>
+                  {activeWorldId ? (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <div style={s.statBox}><div style={s.statVal}>{players.length}</div><div style={s.statLabel}>Players</div></div>
+                        <div style={s.statBox}><div style={s.statVal}>{parties.length}</div><div style={s.statLabel}>Parties</div></div>
+                      </div>
+                      {activeWorld && <p style={{ fontSize: 12, color: '#5a4a30', marginTop: 14, fontStyle: 'italic' }}>Last updated: {new Date(activeWorld.updated_at).toLocaleDateString()}</p>}
+                    </>
+                  ) : (
+                    <p style={s.empty}>Select a world to see its stats.</p>
+                  )}
                 </div>
 
                 <div>
