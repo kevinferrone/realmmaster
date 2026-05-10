@@ -78,7 +78,7 @@ function AuthScreen() {
 
 export default function DMPortal() {
   const { session, loading } = useAuth()
-  const [tab, setTab] = useState<'worlds' | 'players' | 'parties' | 'knowledge' | 'renown' | 'logs'>('worlds')
+  const [tab, setTab] = useState<'worlds' | 'players' | 'knowledge' | 'renown' | 'logs'>('worlds')
 
   const [worlds, setWorlds] = useState<any[]>([])
   
@@ -366,8 +366,7 @@ async function loadLogs() {
 
   const TABS = [
     { id: 'worlds', label: '🌍 Worlds' },
-    { id: 'players', label: '⚔ Players' },
-    { id: 'parties', label: '🛡 Parties' },
+    { id: 'players', label: '🧙 Players' },
     { id: 'knowledge', label: '🧠 Knowledge' },
     { id: 'renown', label: '⭐ Renown' },
     { id: 'logs', label: '📋 Logs' },
@@ -550,7 +549,7 @@ async function loadLogs() {
                       {wbMessages.length === 0 && (
                         <div style={{ padding: '20px 0', textAlign: 'center' as any }}>
                           <p style={{ fontSize: 13, color: '#7a6a50', fontStyle: 'italic' }}>
-                            Start by telling Peekaboo about your world. What's the setting? What makes it unique? What are you trying to build?
+                            Tell Peekaboo about your world. What's the setting? What makes it unique? What are the locations and NPCs? You can also ask Peekaboo about things you have already created about the world.
                           </p>
                         </div>
                       )}
@@ -653,12 +652,14 @@ async function loadLogs() {
           {tab === 'players' && (
             <div>
               <h1 style={s.pageTitle}>Players</h1>
-              <p style={s.pageSub}>Add players and share their unique portal links.</p>
+              <p style={s.pageSub}>Add players, share their portal links, and group them into parties.</p>
               {!activeWorldId && <div style={s.warning}>⚠ Create a world first.</div>}
+
+              {/* Players section */}
               <div style={s.grid2}>
                 <div>
                   <div style={s.card}>
-                    <div style={s.cardTitle}>⚔ Add Player</div>
+                    <div style={s.cardTitle}>🧙 Add Player</div>
                     <input style={s.input} value={newName} onChange={e => setNewName(e.target.value)} placeholder="Player name" />
                     <input style={s.input} value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="Email (optional)" />
                     <button style={s.btnPrimary} onClick={addPlayer} disabled={!activeWorldId}>+ Create Player Link</button>
@@ -709,14 +710,14 @@ async function loadLogs() {
                   }
                 </div>
               </div>
-            </div>
-          )}
 
-          {tab === 'parties' && (
-            <div>
-              <h1 style={s.pageTitle}>Parties</h1>
-              <p style={s.pageSub}>Group characters into parties to grant knowledge or renown to everyone at once.</p>
-              {!activeWorldId && <div style={s.warning}>⚠ Create a world first.</div>}
+              {/* Parties section */}
+              <div style={{ borderTop: '1px solid rgba(201,147,58,0.15)', margin: '28px 0 24px', position: 'relative' }}>
+                <span style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)', background: '#0d0a07', padding: '0 16px', fontSize: 11, color: '#5a4a30', letterSpacing: '0.15em', textTransform: 'uppercase' as any }}>
+                  Parties
+                </span>
+              </div>
+              <p style={{ fontSize: 15, color: '#7a6a50', fontStyle: 'italic', marginBottom: 20 }}>Group characters into parties to grant knowledge or renown to everyone at once.</p>
               <div style={s.grid2}>
                 <div style={s.card}>
                   <div style={s.cardTitle}>🛡 Create Party</div>
@@ -758,7 +759,7 @@ async function loadLogs() {
             </div>
           )}
 
-          {tab === 'knowledge' && (
+                    {tab === 'knowledge' && (
             <div>
               <h1 style={s.pageTitle}>Character Knowledge Manager</h1>
               <p style={s.pageSub}>Grant knowledge to a single character or an entire party at once.</p>
