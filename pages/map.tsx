@@ -43,6 +43,7 @@ export default function MapPage() {
   const [revealMsg, setRevealMsg] = useState('')
 
   const mapRef = useRef<HTMLDivElement>(null)
+  const dragHappenedRef = useRef(false)
   const isDM = !!session
 
   const token = session?.access_token
@@ -88,13 +89,18 @@ export default function MapPage() {
   }
 
   function handleMapClick(e: React.MouseEvent<HTMLDivElement>) {
-    if (!isDM || !addingPin) return
-    const rect = mapRef.current!.getBoundingClientRect()
-    const x = ((e.clientX - rect.left) / rect.width) * 100
-    const y = ((e.clientY - rect.top) / rect.height) * 100
-    setNewPinPos({ x, y })
-    setNewPinName('')
-    setNewPinLore('')
+    if (addingPin) {
+      const rect = mapRef.current!.getBoundingClientRect()
+      const x = ((e.clientX - rect.left) / rect.width) * 100
+      const y = ((e.clientY - rect.top) / rect.height) * 100
+      setNewPinPos({ x, y })
+      setNewPinName('')
+      setNewPinLore('')
+    } else {
+      // Click on map background — close any open pin
+      setSelectedPin(null)
+      setEditingPin(false)
+    }
   }
 
   async function saveNewPin() {
@@ -198,6 +204,7 @@ export default function MapPage() {
               onClick={handleMapClick}
               onMouseMove={e => {
                 if (!draggingId || !mapRef.current) return
+                dragHappenedRef.current = true
                 const rect = mapRef.current.getBoundingClientRect()
                 const x = Math.min(100, Math.max(0, ((e.clientX - rect.left - dragOffset.x) / rect.width) * 100))
                 const y = Math.min(100, Math.max(0, ((e.clientY - rect.top - dragOffset.y) / rect.height) * 100))
@@ -235,19 +242,25 @@ export default function MapPage() {
                       ...(isDragging ? { opacity: 0.7, cursor: 'grabbing' } : { cursor: 'grab' })
                     }}
                     onClick={e => {
-                      if (draggingId) return
+                      if (dragHappenedRef.current) return
                       e.stopPropagation()
-                      setSelectedPin(loc)
-                      setEditingPin(false)
-                      setEditName(loc.name)
-                      setEditLore(loc.lore || '')
-                      setRevealMsg('')
-                      setNewPinPos(null)
+                      if (selectedPin?.id === loc.id) {
+                        setSelectedPin(null)
+                        setEditingPin(false)
+                      } else {
+                        setSelectedPin(loc)
+                        setEditingPin(false)
+                        setEditName(loc.name)
+                        setEditLore(loc.lore || '')
+                        setRevealMsg('')
+                        setNewPinPos(null)
+                      }
                     }}
                     onMouseDown={e => {
                       if (addingPin) return
                       e.stopPropagation()
                       e.preventDefault()
+                      dragHappenedRef.current = false
                       const rect = mapRef.current!.getBoundingClientRect()
                       const pinX = (loc.x_percent / 100) * rect.width
                       const pinY = (loc.y_percent / 100) * rect.height
@@ -308,7 +321,7 @@ export default function MapPage() {
                 ) : (
                   <>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                      <div style={s.panelTitle}>📍 {selectedPin.name}</div>
+                      <div style={{ ...s.panelTitle, cursor: 'pointer' }} title="Click to close" onClick={() => { setSelectedPin(null); setEditingPin(false) }}>📍 {selectedPin.name}</div>
                       <div style={{ display: 'flex', gap: 6 }}>
                         <button style={s.btnSm} onClick={() => setEditingPin(true)}>Edit</button>
                         <button style={{ ...s.btnSm, color: '#c04040', borderColor: '#8b2020' }} onClick={deletePin}>✕</button>
@@ -368,18 +381,29 @@ export default function MapPage() {
               </div>
             )}
 
-            {!selectedPin && !newPinPos && (
+            {/* Location list — always visible when not placing a new pin */}
+            {!newPinPos && (
               <div style={s.panel}>
-                <div style={s.panelTitle}>🗺 World Map</div>
-                <p style={{ fontSize: 13, color: '#7a6a50', fontStyle: 'italic' }}>
-                  {addingPin ? 'Click on the map to place a pin.' : 'Click a pin to view or reveal its lore. Use "+ Add Pin" to place new locations.'}
-                </p>
-                <div style={{ marginTop: 14 }}>
+                <div style={s.panelTitle}>🗺 {selectedPin ? 'All Locations' : 'World Map'}</div>
+                {!selectedPin && (
+                  <p style={{ fontSize: 13, color: '#7a6a50', fontStyle: 'italic', marginBottom: 10 }}>
+                    {addingPin ? 'Click on the map to place a pin.' : 'Click a pin or name below to view its lore. Click again or click the map to close.'}
+                  </p>
+                )}
+                <div style={{ marginTop: selectedPin ? 0 : 4 }}>
                   <div style={{ fontSize: 11, color: '#7a6a50', textTransform: 'uppercase' as any, letterSpacing: '0.1em', marginBottom: 8 }}>All Locations ({locations.length})</div>
+                  {locations.length === 0 && <p style={{ fontSize: 13, color: '#5a4a30', fontStyle: 'italic' }}>No locations yet. Use "+ Add Pin" to place locations on the map.</p>}
                   {locations.map(loc => (
                     <div key={loc.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(201,147,58,0.08)', cursor: 'pointer', fontSize: 13 }}
-                      onClick={() => { setSelectedPin(loc); setEditName(loc.name); setEditLore(loc.lore || '') }}>
-                      <span style={{ color: '#e8dcc8' }}>{loc.name}</span>
+                      onClick={() => {
+                        if (selectedPin?.id === loc.id) {
+                          setSelectedPin(null)
+                          setEditingPin(false)
+                        } else {
+                          setSelectedPin(loc); setEditName(loc.name); setEditLore(loc.lore || ''); setRevealMsg('')
+                        }
+                      }}>
+                      <span style={{ color: selectedPin?.id === loc.id ? '#c9933a' : '#e8dcc8' }}>{loc.name}</span>
                       <span style={{ color: '#5a4a30', fontSize: 11 }}>{getRevealedPlayerCount(loc.id)} revealed</span>
                     </div>
                   ))}
