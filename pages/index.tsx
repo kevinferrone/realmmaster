@@ -120,6 +120,17 @@ export default function DMPortal() {
   const [knowledgeTab, setKnowledgeTab] = useState<'ledger' | 'sessions'>('ledger')
   const [grantMsg, setGrantMsg] = useState('')
 
+  // Knowledge builder (Peekaboo) chat state
+  const [kbMessages, setKbMessages] = useState<{role:string,content:string}[]>([])
+  const [kbInput, setKbInput] = useState('')
+  const [kbLoading, setKbLoading] = useState(false)
+  const [kbSuggestions, setKbSuggestions] = useState<any[]>([])
+  const [kbGrantTarget, setKbGrantTarget] = useState<'player'|'party'>('player')
+  const [kbGrantPlayer, setKbGrantPlayer] = useState('')
+  const [kbGrantParty, setKbGrantParty] = useState('')
+  const [kbGrantMsg, setKbGrantMsg] = useState('')
+  const [kbGranting, setKbGranting] = useState(false)
+
   const [renownMap, setRenownMap] = useState<Record<string, any>>({})
   const [newRenown, setNewRenown] = useState({ points: '', reason: '' })
   const [renownTarget, setRenownTarget] = useState<'player' | 'party'>('player')
@@ -213,6 +224,45 @@ export default function DMPortal() {
     const d = await r.json()
     setKnowledge(d.knowledge || [])
     setSessions(d.sessions || [])
+  }
+
+  async function sendKbMessage() {
+    if (!kbInput.trim() || kbLoading || !activeWorldId) return
+    const userMsg = kbInput.trim()
+    setKbInput('')
+    setKbLoading(true)
+    const newHistory = [...kbMessages, { role: 'user', content: userMsg }]
+    setKbMessages(newHistory)
+    setKbSuggestions([])
+    setKbGrantMsg('')
+    const r = await fetch('/api/dm/knowledge-builder', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ worldId: activeWorldId, message: userMsg, history: kbMessages, players })
+    })
+    const d = await r.json()
+    if (d.reply) setKbMessages([...newHistory, { role: 'assistant', content: d.reply }])
+    if (d.suggestions?.length) setKbSuggestions(d.suggestions)
+    setKbLoading(false)
+  }
+
+  async function grantKbSuggestions() {
+    if (!kbSuggestions.length || kbGranting) return
+    if (kbGrantTarget === 'player' && !kbGrantPlayer) { setKbGrantMsg('Select a player first.'); return }
+    if (kbGrantTarget === 'party' && !kbGrantParty) { setKbGrantMsg('Select a party first.'); return }
+    setKbGranting(true)
+    setKbGrantMsg('')
+    let success = 0
+    for (const s of kbSuggestions) {
+      const body: any = { worldId: activeWorldId, title: s.title, content: s.content, category: s.category, source: 'dm_granted' }
+      if (kbGrantTarget === 'player') body.playerId = kbGrantPlayer
+      else body.partyId = kbGrantParty
+      const r = await fetch('/api/dm/knowledge', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body) })
+      if (r.ok) success++
+    }
+    setKbGrantMsg(`✓ Granted ${success} knowledge entr${success === 1 ? 'y' : 'ies'}.`)
+    setKbSuggestions([])
+    if (selectedPlayer) loadPlayerKnowledge(selectedPlayer)
+    setKbGranting(false)
   }
 
   async function grantKnowledge() {
@@ -762,7 +812,123 @@ async function loadLogs() {
                     {tab === 'knowledge' && (
             <div>
               <h1 style={s.pageTitle}>Character Knowledge Manager</h1>
-              <p style={s.pageSub}>Grant knowledge to a single character or an entire party at once.</p>
+              <p style={s.pageSub}>Ask Peekaboo to search canon or suggest knowledge to grant. Or grant entries directly below.</p>
+
+              {/* Peekaboo knowledge chat */}
+              <div style={{ ...s.card, marginBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, paddingBottom: 10, borderBottom: '1px solid rgba(201,147,58,0.1)' }}>
+                  <svg width="36" height="44" viewBox="0 0 56 68" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+                    <rect x="6" y="46" width="44" height="22" rx="3" fill="#7a8fa0"/><rect x="10" y="43" width="36" height="16" rx="3" fill="#8fa3b5"/><ellipse cx="8" cy="46" rx="8" ry="6" fill="#6a7f90"/><ellipse cx="48" cy="46" rx="8" ry="6" fill="#6a7f90"/><rect x="18" y="39" width="20" height="10" rx="2" fill="#9fb3c2"/><rect x="22" y="34" width="12" height="8" fill="#c8936a"/><ellipse cx="28" cy="26" rx="16" ry="16" fill="#c8936a"/><ellipse cx="14" cy="32" rx="7" ry="9" fill="#e0609a"/><ellipse cx="42" cy="32" rx="7" ry="9" fill="#e0609a"/><ellipse cx="28" cy="37" rx="13" ry="8" fill="#e0609a"/><ellipse cx="28" cy="30" rx="9" ry="3.5" fill="#c84d88"/><circle cx="22" cy="22" r="2.5" fill="#1a0e08"/><circle cx="34" cy="22" r="2.5" fill="#1a0e08"/><circle cx="23" cy="21" r="0.9" fill="white"/><circle cx="35" cy="21" r="0.9" fill="white"/><ellipse cx="28" cy="27" rx="2.5" ry="1.8" fill="#b07a52"/><path d="M 22 32 Q 28 36 34 32" stroke="#8a3a3a" strokeWidth="1.5" fill="none" strokeLinecap="round"/><circle cx="17" cy="27" r="4" fill="#e8a0a0" opacity="0.35"/><circle cx="39" cy="27" r="4" fill="#e8a0a0" opacity="0.35"/>
+                  </svg>
+                  <div>
+                    <div style={s.cardTitle}>💬 Ask Peekaboo</div>
+                    <div style={{ fontSize: 11, color: '#7a6a50', fontStyle: 'italic', marginTop: -6 }}>Search canon · Suggest knowledge to grant</div>
+                  </div>
+                </div>
+
+                <div style={s.grid2}>
+                  {/* Chat */}
+                  <div style={{ display: 'flex', flexDirection: 'column' as any, gap: 8 }}>
+                    <div style={{ background: '#0d0a07', border: '1px solid rgba(201,147,58,0.15)', borderRadius: 8, height: 280, overflowY: 'auto' as any, display: 'flex', flexDirection: 'column' as any, gap: 10, padding: '10px 12px' }}>
+                      {kbMessages.length === 0 && (
+                        <p style={{ fontSize: 13, color: '#5a4a30', fontStyle: 'italic', textAlign: 'center' as any, padding: '30px 8px' }}>
+                          Ask Peekaboo to search your world canon, or say something like "grant the party knowledge of the Crystal Mountains" to get suggestions to review.
+                        </p>
+                      )}
+                      {kbMessages.map((m, i) => (
+                        <div key={i} style={{ display: 'flex', gap: 8, flexDirection: m.role === 'user' ? 'row-reverse' as any : 'row' as any, alignItems: 'flex-start' }}>
+                          <div style={{ width: 26, height: 26, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, background: m.role === 'user' ? 'rgba(201,147,58,0.15)' : 'rgba(224,96,154,0.15)', border: `1px solid ${m.role === 'user' ? 'rgba(201,147,58,0.3)' : 'rgba(224,96,154,0.4)'}`, color: m.role === 'user' ? '#e8b86d' : '#e0609a' }}>
+                            {m.role === 'user' ? 'DM' : 'PB'}
+                          </div>
+                          <div style={{ maxWidth: '80%', padding: '8px 12px', borderRadius: 8, fontSize: 13, lineHeight: 1.6, background: m.role === 'user' ? 'rgba(201,147,58,0.09)' : '#1a1206', border: `1px solid ${m.role === 'user' ? 'rgba(201,147,58,0.2)' : 'rgba(224,96,154,0.15)'}`, color: '#e8dcc8', whiteSpace: 'pre-wrap' as any }}>
+                            {m.content}
+                          </div>
+                        </div>
+                      ))}
+                      {kbLoading && (
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                          <div style={{ width: 26, height: 26, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, background: 'rgba(224,96,154,0.15)', border: '1px solid rgba(224,96,154,0.4)', color: '#e0609a' }}>PB</div>
+                          <div style={{ padding: '8px 12px', borderRadius: 8, fontSize: 13, background: '#1a1206', border: '1px solid rgba(224,96,154,0.15)', color: '#5a4a30', fontStyle: 'italic' }}>Thinking...</div>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <textarea style={{ ...s.input, margin: 0, flex: 1, height: 42, resize: 'none' as any }}
+                        value={kbInput} onChange={e => setKbInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendKbMessage() } }}
+                        placeholder='e.g. "What do we know about Aryn Sora?" or "Grant the party knowledge of Brinewake"'
+                        disabled={kbLoading || !activeWorldId} />
+                      <button style={{ ...s.btnSm, height: 42, padding: '0 14px' }} onClick={sendKbMessage} disabled={kbLoading || !activeWorldId || !kbInput.trim()}>➤</button>
+                    </div>
+                    <button style={s.btnSm} onClick={() => { setKbMessages([]); setKbSuggestions([]); setKbGrantMsg('') }}>Clear chat</button>
+                  </div>
+
+                  {/* Suggestions review panel */}
+                  <div>
+                    {kbSuggestions.length > 0 ? (
+                      <div>
+                        <div style={s.cardTitle}>📋 Review Knowledge Suggestions</div>
+                        <p style={{ fontSize: 12, color: '#7a6a50', fontStyle: 'italic', marginBottom: 12 }}>Edit if needed, then choose who to grant to.</p>
+
+                        {kbSuggestions.map((s_: any, i: number) => (
+                          <div key={i} style={{ background: '#1a1206', border: '1px solid rgba(201,147,58,0.18)', borderRadius: 8, padding: '10px 12px', marginBottom: 10 }}>
+                            <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+                              <select style={{ ...s.select, flex: '0 0 auto', width: 110, fontSize: 11 }}
+                                value={s_.category}
+                                onChange={e => setKbSuggestions(prev => prev.map((x, xi) => xi === i ? { ...x, category: e.target.value } : x))}>
+                                {['location','faction','npc','item','event','lore','secret'].map(c => <option key={c} value={c}>{c}</option>)}
+                              </select>
+                              <input style={{ ...s.input, margin: 0, flex: 1, fontSize: 12 }}
+                                value={s_.title}
+                                onChange={e => setKbSuggestions(prev => prev.map((x, xi) => xi === i ? { ...x, title: e.target.value } : x))} />
+                              <button style={{ ...s.btnSm, color: '#c04040', borderColor: '#8b2020', padding: '0 8px' }}
+                                onClick={() => setKbSuggestions(prev => prev.filter((_, xi) => xi !== i))}>✕</button>
+                            </div>
+                            <textarea style={{ ...s.input, height: 68, resize: 'vertical' as any, fontSize: 12, margin: 0 }}
+                              value={s_.content}
+                              onChange={e => setKbSuggestions(prev => prev.map((x, xi) => xi === i ? { ...x, content: e.target.value } : x))} />
+                          </div>
+                        ))}
+
+                        {/* Grant target selection */}
+                        <div style={{ background: 'rgba(201,147,58,0.05)', border: '1px solid rgba(201,147,58,0.15)', borderRadius: 8, padding: '12px 14px', marginTop: 4 }}>
+                          <div style={{ fontSize: 11, color: '#7a6a50', textTransform: 'uppercase' as any, letterSpacing: '0.1em', marginBottom: 8 }}>Grant to</div>
+                          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                            <button style={{ ...s.btnSm, ...(kbGrantTarget === 'player' ? { background: 'rgba(201,147,58,0.15)', borderColor: '#c9933a', color: '#e8b86d' } : {}) }}
+                              onClick={() => setKbGrantTarget('player')}>Single Player</button>
+                            <button style={{ ...s.btnSm, ...(kbGrantTarget === 'party' ? { background: 'rgba(201,147,58,0.15)', borderColor: '#c9933a', color: '#e8b86d' } : {}) }}
+                              onClick={() => setKbGrantTarget('party')}>Entire Party</button>
+                          </div>
+                          {kbGrantTarget === 'player' && (
+                            <select style={s.select} value={kbGrantPlayer} onChange={e => setKbGrantPlayer(e.target.value)}>
+                              <option value="">Select player...</option>
+                              {players.map(p => <option key={p.id} value={p.id}>{p.character_name || p.name}</option>)}
+                            </select>
+                          )}
+                          {kbGrantTarget === 'party' && (
+                            <select style={s.select} value={kbGrantParty} onChange={e => setKbGrantParty(e.target.value)}>
+                              <option value="">Select party...</option>
+                              {parties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                          )}
+                          <button style={s.btnPrimary} onClick={grantKbSuggestions} disabled={kbGranting}>
+                            {kbGranting ? 'Granting...' : `✨ Grant ${kbSuggestions.length} Entr${kbSuggestions.length === 1 ? 'y' : 'ies'}`}
+                          </button>
+                          {kbGrantMsg && <p style={{ fontSize: 13, color: kbGrantMsg.startsWith('✓') ? '#5aaa5a' : '#c04040', marginTop: 8 }}>{kbGrantMsg}</p>}
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 200 }}>
+                        <p style={{ fontSize: 14, color: '#5a4a30', fontStyle: 'italic', textAlign: 'center' as any, padding: '0 20px' }}>
+                          When Peekaboo suggests knowledge to grant, it will appear here for your review.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Existing grant + ledger section */}
               <div style={s.grid2}>
                 <div>
                   <div style={s.card}>
