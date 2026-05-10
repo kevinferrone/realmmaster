@@ -42,6 +42,20 @@ export default function MapPage() {
   const [revealParty, setRevealParty] = useState('')
   const [revealMsg, setRevealMsg] = useState('')
 
+  // Location builder chat state
+  const [canonText, setCanonText] = useState('')
+  const [locMessages, setLocMessages] = useState<{role:string,content:string}[]>([])
+  const [locInput, setLocInput] = useState('')
+  const [locLoading, setLocLoading] = useState(false)
+  const [locLastExchange, setLocLastExchange] = useState<{user:string,assistant:string}|null>(null)
+  const [locPinLore, setLocPinLore] = useState('')
+  const [locExtracting, setLocExtracting] = useState(false)
+  const [locCanonPreview, setLocCanonPreview] = useState<any[]|null>(null)
+  const [locCanonPreviewLoading, setLocCanonPreviewLoading] = useState(false)
+  const [locCanonSaving, setLocCanonSaving] = useState(false)
+  const [locCanonMsg, setLocCanonMsg] = useState('')
+  const [locExists, setLocExists] = useState(false)
+
   const mapRef = useRef<HTMLDivElement>(null)
   const dragHappenedRef = useRef(false)
   const isDM = !!session
@@ -63,6 +77,7 @@ export default function MapPage() {
       const w = target || d.worlds[0]
       setWorldId(w.id)
       setMapImageUrl(w.map_image_url || '')
+      setCanonText(w.canon_text || '')
     }
   }
 
@@ -96,6 +111,13 @@ export default function MapPage() {
       setNewPinPos({ x, y })
       setNewPinName('')
       setNewPinLore('')
+      setLocMessages([])
+      setLocInput('')
+      setLocLastExchange(null)
+      setLocPinLore('')
+      setLocCanonPreview(null)
+      setLocCanonMsg('')
+      setLocExists(false)
     } else {
       // Click on map background — close any open pin
       setSelectedPin(null)
@@ -103,11 +125,77 @@ export default function MapPage() {
     }
   }
 
+  async function sendLocMessage() {
+    if (!locInput.trim() || !newPinName.trim() || locLoading) return
+    const userMsg = locInput.trim()
+    setLocInput('')
+    setLocLoading(true)
+    const newHistory = [...locMessages, { role: 'user', content: userMsg }]
+    setLocMessages(newHistory)
+    const r = await fetch('/api/dm/location-builder', {
+      method: 'POST', headers: authH,
+      body: JSON.stringify({ worldId, locationName: newPinName, message: userMsg, history: locMessages })
+    })
+    const d = await r.json()
+    if (d.reply) {
+      setLocMessages([...newHistory, { role: 'assistant', content: d.reply }])
+      setLocLastExchange({ user: userMsg, assistant: d.reply })
+      setLocExists(d.locationExists || false)
+    }
+    setLocLoading(false)
+  }
+
+  async function extractPinLore() {
+    if (locMessages.length === 0 || !newPinName.trim()) return
+    setLocExtracting(true)
+    const r = await fetch('/api/dm/location-builder', {
+      method: 'POST', headers: authH,
+      body: JSON.stringify({ worldId, locationName: newPinName, action: 'extract', history: locMessages })
+    })
+    const d = await r.json()
+    if (d.pinLore) setLocPinLore(d.pinLore)
+    else setLocPinLore('')
+    setLocExtracting(false)
+  }
+
+  async function previewLocCanon() {
+    if (!locLastExchange || !worldId) return
+    setLocCanonPreviewLoading(true)
+    setLocCanonPreview(null)
+    const r = await fetch('/api/dm/commit-lore', {
+      method: 'POST', headers: authH,
+      body: JSON.stringify({
+        worldId,
+        lastUserMessage: locLastExchange.user,
+        lastAssistantMessage: locLastExchange.assistant
+      })
+    })
+    const d = await r.json()
+    if (d.preview) setLocCanonPreview(d.preview)
+    setLocCanonPreviewLoading(false)
+  }
+
+  async function saveLocCanon() {
+    if (!locCanonPreview || !worldId) return
+    setLocCanonSaving(true)
+    const r = await fetch('/api/dm/commit-lore', {
+      method: 'POST', headers: authH,
+      body: JSON.stringify({ worldId, action: 'save', previewData: locCanonPreview })
+    })
+    const d = await r.json()
+    if (d.success) {
+      setCanonText(d.canonText)
+      setLocCanonMsg('✓ Committed to world canon!')
+      setLocCanonPreview(null)
+    }
+    setLocCanonSaving(false)
+  }
+
   async function saveNewPin() {
     if (!newPinName.trim() || !newPinPos || !worldId) return
     const r = await fetch('/api/dm/map', {
       method: 'POST', headers: authH,
-      body: JSON.stringify({ worldId, name: newPinName, lore: newPinLore, xPercent: newPinPos.x, yPercent: newPinPos.y })
+      body: JSON.stringify({ worldId, name: newPinName, lore: locPinLore || '', xPercent: newPinPos.x, yPercent: newPinPos.y })
     })
     const d = await r.json()
     if (d.location) {
@@ -290,17 +378,119 @@ export default function MapPage() {
           </div>
 
           {/* SIDEBAR */}
-          <div style={s.sidebar}>
+          <div style={{ ...s.sidebar, width: newPinPos ? 380 : 300 }}>
 
-            {/* New pin form */}
+            {/* New pin form — Peekaboo chat */}
             {newPinPos && (
               <div style={s.panel}>
                 <div style={s.panelTitle}>📍 New Location</div>
-                <input style={s.input} value={newPinName} onChange={e => setNewPinName(e.target.value)} placeholder="Location name" autoFocus />
-                <textarea style={{ ...s.input, height: 80, resize: 'vertical' as any }} value={newPinLore} onChange={e => setNewPinLore(e.target.value)} placeholder="Location lore (revealed to players later)..." />
+
+                {/* Name input + canon indicator */}
+                <input style={s.input} value={newPinName}
+                  onChange={e => { setNewPinName(e.target.value); setLocMessages([]); setLocLastExchange(null); setLocPinLore(''); setLocCanonPreview(null); setLocCanonMsg(''); setLocExists(false) }}
+                  placeholder="Location name" autoFocus />
+                {newPinName.length > 2 && canonText && (
+                  <div style={{ fontSize: 11, marginBottom: 8, marginTop: -6 }}>
+                    {canonText.toLowerCase().includes(newPinName.toLowerCase())
+                      ? <span style={{ color: '#c9933a' }}>📜 Found in canon — Peekaboo will work within established lore</span>
+                      : <span style={{ color: '#5a4a30' }}>✦ New location — Peekaboo will help you build it</span>
+                    }
+                  </div>
+                )}
+
+                {/* Peekaboo chat */}
+                <div style={{ background: '#0d0a07', border: '1px solid rgba(201,147,58,0.18)', borderRadius: 8, display: 'flex', flexDirection: 'column' as any, height: 260, marginBottom: 10 }}>
+                  <div style={{ flex: 1, overflowY: 'auto' as any, display: 'flex', flexDirection: 'column' as any, gap: 8, padding: '10px 10px 8px' }}>
+                    {locMessages.length === 0 && (
+                      <p style={{ fontSize: 12, color: '#5a4a30', fontStyle: 'italic', textAlign: 'center' as any, padding: '20px 4px' }}>
+                        Tell Peekaboo about this location, or ask him to pull in information about this location from your existing world canon.
+                      </p>
+                    )}
+                    {locMessages.map((m, i) => (
+                      <div key={i} style={{ display: 'flex', gap: 6, flexDirection: m.role === 'user' ? 'row-reverse' as any : 'row' as any, alignItems: 'flex-start' }}>
+                        <div style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, background: m.role === 'user' ? 'rgba(201,147,58,0.15)' : 'rgba(224,96,154,0.15)', border: `1px solid ${m.role === 'user' ? 'rgba(201,147,58,0.3)' : 'rgba(224,96,154,0.4)'}`, color: m.role === 'user' ? '#e8b86d' : '#e0609a' }}>
+                          {m.role === 'user' ? 'DM' : 'PB'}
+                        </div>
+                        <div style={{ maxWidth: '85%', padding: '7px 10px', borderRadius: 8, fontSize: 12, lineHeight: 1.6, background: m.role === 'user' ? 'rgba(201,147,58,0.09)' : '#1a1206', border: `1px solid ${m.role === 'user' ? 'rgba(201,147,58,0.2)' : 'rgba(224,96,154,0.15)'}`, color: '#e8dcc8', whiteSpace: 'pre-wrap' as any }}>
+                          {m.content}
+                        </div>
+                      </div>
+                    ))}
+                    {locLoading && (
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+                        <div style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, background: 'rgba(224,96,154,0.15)', border: '1px solid rgba(224,96,154,0.4)', color: '#e0609a' }}>PB</div>
+                        <div style={{ padding: '7px 10px', borderRadius: 8, fontSize: 12, background: '#1a1206', border: '1px solid rgba(224,96,154,0.15)', color: '#5a4a30', fontStyle: 'italic' }}>Thinking...</div>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, padding: '0 8px 8px', borderTop: '1px solid rgba(201,147,58,0.1)', paddingTop: 8 }}>
+                    <textarea
+                      style={{ ...s.input, margin: 0, flex: 1, height: 36, resize: 'none' as any, fontSize: 12, padding: '8px 10px' }}
+                      value={locInput}
+                      onChange={e => setLocInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendLocMessage() } }}
+                      placeholder={newPinName.trim() ? `Tell Peekaboo about ${newPinName}...` : 'Enter a location name first...'}
+                      disabled={locLoading || !newPinName.trim()}
+                    />
+                    <button style={{ ...s.btnSm, padding: '0 10px', height: 36 }} onClick={sendLocMessage} disabled={locLoading || !newPinName.trim() || !locInput.trim()}>➤</button>
+                  </div>
+                </div>
+
+                {/* Pin lore extraction */}
+                {locMessages.length > 0 && (
+                  <div style={{ marginBottom: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <div style={{ fontSize: 10, color: '#7a6a50', textTransform: 'uppercase' as any, letterSpacing: '0.1em' }}>Pin Lore (shown to players)</div>
+                      <button style={s.btnSm} onClick={extractPinLore} disabled={locExtracting}>
+                        {locExtracting ? '...' : '⟳ Extract'}
+                      </button>
+                    </div>
+                    <textarea
+                      style={{ ...s.input, height: 72, resize: 'vertical' as any, fontSize: 12, margin: 0, fontStyle: locPinLore ? 'normal' : 'italic' }}
+                      value={locPinLore}
+                      onChange={e => setLocPinLore(e.target.value)}
+                      placeholder="Click ⟳ Extract to generate lore from chat, or type it directly..."
+                    />
+                  </div>
+                )}
+
+                {/* Canon commit section */}
+                {locLastExchange && (
+                  <div style={{ marginBottom: 10 }}>
+                    <button style={{ ...s.btnSm, width: '100%', marginBottom: 6, textAlign: 'center' as any }}
+                      onClick={previewLocCanon} disabled={locCanonPreviewLoading}>
+                      {locCanonPreviewLoading ? 'Extracting lore...' : '📋 Preview Canon Commit'}
+                    </button>
+                    {locCanonPreview && locCanonPreview.length > 0 && (
+                      <div style={{ background: '#1a1206', border: '1px solid rgba(201,147,58,0.18)', borderRadius: 8, padding: '10px 12px', marginBottom: 6 }}>
+                        {locCanonPreview.map((entry: any, i: number) => (
+                          <div key={i} style={{ marginBottom: 10 }}>
+                            <div style={{ fontSize: 10, color: '#c9933a', letterSpacing: '0.1em', textTransform: 'uppercase' as any, marginBottom: 4 }}>
+                              {entry.section.replace('## ', '')}
+                            </div>
+                            <textarea
+                              style={{ ...s.input, height: 60, resize: 'vertical' as any, fontSize: 11, fontFamily: 'monospace', margin: 0 }}
+                              value={entry.content}
+                              onChange={e => setLocCanonPreview((prev: any) => prev.map((p: any, pi: number) => pi === i ? { ...p, content: e.target.value } : p))}
+                            />
+                          </div>
+                        ))}
+                        <button style={{ ...s.btnPrimary, fontSize: 11, padding: '8px 14px' }} onClick={saveLocCanon} disabled={locCanonSaving}>
+                          {locCanonSaving ? 'Committing...' : '✨ Commit to World Canon'}
+                        </button>
+                      </div>
+                    )}
+                    {locCanonPreview && locCanonPreview.length === 0 && (
+                      <p style={{ fontSize: 11, color: '#c04040', fontStyle: 'italic' }}>No concrete lore found. Keep chatting and try again.</p>
+                    )}
+                    {locCanonMsg && <p style={{ fontSize: 12, color: '#5aaa5a', marginTop: 4 }}>{locCanonMsg}</p>}
+                  </div>
+                )}
+
+                {/* Save / Cancel */}
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button style={s.btnPrimary} onClick={saveNewPin}>Save Pin</button>
-                  <button style={s.btnSm} onClick={() => setNewPinPos(null)}>Cancel</button>
+                  <button style={s.btnPrimary} onClick={saveNewPin} disabled={!newPinName.trim()}>Save Pin</button>
+                  <button style={s.btnSm} onClick={() => { setNewPinPos(null); setAddingPin(false) }}>Cancel</button>
                 </div>
               </div>
             )}
