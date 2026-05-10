@@ -622,7 +622,7 @@ const s: Record<string, React.CSSProperties> = {
   pinDot: { width: 12, height: 12, borderRadius: '50%', background: '#c9933a', border: '2px solid #f5d49a', boxShadow: '0 0 6px rgba(201,147,58,0.6)' },
   pinLabel: { background: 'rgba(13,10,7,0.85)', border: '1px solid rgba(201,147,58,0.4)', borderRadius: 4, padding: '2px 6px', fontSize: 11, color: '#e8b86d', whiteSpace: 'nowrap', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 },
   revealBadge: { background: '#5aaa5a', color: '#0d0a07', borderRadius: '50%', width: 14, height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700 },
-  sidebar: { width: 300, borderLeft: '1px solid rgba(201,147,58,0.2)', background: '#0d0a07', overflowY: 'auto', flexShrink: 0 },
+  sidebar: { width: 300, borderLeft: '1px solid rgba(201,147,58,0.2)', background: '#0d0a07', overflowY: 'auto', flexShrink: 0, height: '100%', boxSizing: 'border-box' as any },
   panel: { padding: '1.25rem', borderBottom: '1px solid rgba(201,147,58,0.1)' },
   panelTitle: { fontSize: 12, letterSpacing: '0.12em', color: '#e8b86d', marginBottom: 12, textTransform: 'uppercase' },
   loreBox: { background: '#1a1206', border: '1px solid rgba(201,147,58,0.15)', borderRadius: 8, padding: '10px 12px', minHeight: 60 },
