@@ -130,6 +130,9 @@ export default function DMPortal() {
   const [kbGrantParty, setKbGrantParty] = useState('')
   const [kbGrantMsg, setKbGrantMsg] = useState('')
   const [kbGranting, setKbGranting] = useState(false)
+  const [kbCanonProposal, setKbCanonProposal] = useState<any[]>([])
+  const [kbCanonSaving, setKbCanonSaving] = useState(false)
+  const [kbCanonMsg, setKbCanonMsg] = useState('')
 
   const [renownMap, setRenownMap] = useState<Record<string, any>>({})
   const [newRenown, setNewRenown] = useState({ points: '', reason: '' })
@@ -234,7 +237,9 @@ export default function DMPortal() {
     const newHistory = [...kbMessages, { role: 'user', content: userMsg }]
     setKbMessages(newHistory)
     setKbSuggestions([])
+    setKbCanonProposal([])
     setKbGrantMsg('')
+    setKbCanonMsg('')
     const r = await fetch('/api/dm/knowledge-builder', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ worldId: activeWorldId, message: userMsg, history: kbMessages, players })
@@ -242,7 +247,28 @@ export default function DMPortal() {
     const d = await r.json()
     if (d.reply) setKbMessages([...newHistory, { role: 'assistant', content: d.reply }])
     if (d.suggestions?.length) setKbSuggestions(d.suggestions)
+    if (d.canonProposal?.length) setKbCanonProposal(d.canonProposal)
     setKbLoading(false)
+  }
+
+  async function commitKbCanon() {
+    if (!kbCanonProposal.length || kbCanonSaving || !activeWorldId) return
+    setKbCanonSaving(true)
+    setKbCanonMsg('')
+    const r = await fetch('/api/dm/commit-lore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ worldId: activeWorldId, action: 'save', previewData: kbCanonProposal })
+    })
+    const d = await r.json()
+    if (d.success) {
+      setCanonText(d.canonText || canonText)
+      setKbCanonMsg('✓ Added to world canon!')
+      setKbCanonProposal([])
+    } else {
+      setKbCanonMsg('Error saving to canon.')
+    }
+    setKbCanonSaving(false)
   }
 
   async function grantKbSuggestions() {
@@ -935,8 +961,35 @@ async function loadLogs() {
                     ) : (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 200 }}>
                         <p style={{ fontSize: 14, color: '#5a4a30', fontStyle: 'italic', textAlign: 'center' as any, padding: '0 20px' }}>
-                          When Peekaboo suggests knowledge to grant, it will appear here for your review.
+                          When Peekaboo suggests knowledge to grant or canon to add, it will appear here for your review.
                         </p>
+                      </div>
+                    )}
+
+                    {/* Canon proposal panel */}
+                    {kbCanonProposal.length > 0 && (
+                      <div style={{ marginTop: 14 }}>
+                        <div style={s.cardTitle}>📜 Canon Proposal — Review Before Saving</div>
+                        <p style={{ fontSize: 12, color: '#7a6a50', fontStyle: 'italic', marginBottom: 10 }}>Edit if needed, then commit to add this to your world canon.</p>
+                        {kbCanonProposal.map((entry: any, i: number) => (
+                          <div key={i} style={{ marginBottom: 12 }}>
+                            <div style={{ fontSize: 10, color: '#c9933a', letterSpacing: '0.1em', textTransform: 'uppercase' as any, marginBottom: 4 }}>
+                              {entry.section.replace('## ', '')}
+                            </div>
+                            <textarea
+                              style={{ ...s.input, height: 72, resize: 'vertical' as any, fontSize: 12, fontFamily: 'monospace', margin: 0 }}
+                              value={entry.content}
+                              onChange={e => setKbCanonProposal(prev => prev.map((p, pi) => pi === i ? { ...p, content: e.target.value } : p))}
+                            />
+                          </div>
+                        ))}
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <button style={s.btnPrimary} onClick={commitKbCanon} disabled={kbCanonSaving}>
+                            {kbCanonSaving ? 'Saving...' : '✨ Commit to World Canon'}
+                          </button>
+                          <button style={s.btnSm} onClick={() => { setKbCanonProposal([]); setKbCanonMsg('') }}>Discard</button>
+                        </div>
+                        {kbCanonMsg && <p style={{ fontSize: 13, color: kbCanonMsg.startsWith('✓') ? '#5aaa5a' : '#c04040', marginTop: 8 }}>{kbCanonMsg}</p>}
                       </div>
                     )}
                   </div>
