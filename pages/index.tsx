@@ -78,7 +78,7 @@ function AuthScreen() {
 
 export default function DMPortal() {
   const { session, loading } = useAuth()
-  const [tab, setTab] = useState<'world' | 'builder' | 'players' | 'parties' | 'knowledge' | 'renown' | 'logs'>('world')
+  const [tab, setTab] = useState<'worlds' | 'players' | 'parties' | 'knowledge' | 'renown' | 'logs'>('worlds')
 
   const [worlds, setWorlds] = useState<any[]>([])
   
@@ -365,8 +365,7 @@ async function loadLogs() {
   if (!session) return <AuthScreen />
 
   const TABS = [
-    { id: 'world', label: '📜 World' },
-    { id: 'builder', label: '✨ World Builder' },
+    { id: 'worlds', label: '🌍 Worlds' },
     { id: 'players', label: '⚔ Players' },
     { id: 'parties', label: '🛡 Parties' },
     { id: 'knowledge', label: '🧠 Knowledge' },
@@ -399,10 +398,13 @@ async function loadLogs() {
 
         <main style={s.main}>
 
-          {tab === 'world' && (
+          {tab === 'worlds' && (
             <div>
-              <h1 style={s.pageTitle}>World Canon</h1>
-              <p style={s.pageSub}>Your world lore is the AI DM's source of truth.</p>
+              <h1 style={s.pageTitle}>Worlds</h1>
+              <p style={s.pageSub}>Manage your world settings, canon, and build new lore with Claude.</p>
+              {!activeWorldId && <div style={s.warning}>⚠ Create a world first.</div>}
+
+              {/* World Settings + Stats */}
               <div style={s.grid2}>
                 <div style={s.card}>
                   <div style={s.cardTitle}>🌍 World Settings</div>
@@ -423,7 +425,7 @@ async function loadLogs() {
                   <input style={s.input} value={worldName} onChange={e => setWorldName(e.target.value)} placeholder="e.g. Sorasula" />
                   <label style={s.label}>Description</label>
                   <textarea style={{ ...s.input, height: 64, resize: 'vertical' as any }} value={worldDesc} onChange={e => setWorldDesc(e.target.value)} placeholder="Brief description for the AI DM..." />
-                <label style={s.label}>World Map Image</label>
+                  <label style={s.label}>World Map Image</label>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
                     <input style={{ ...s.input, margin: 0, flex: 1 }} value={worldMap} onChange={e => setWorldMap(e.target.value)} placeholder="Map image URL (auto-filled on upload)" />
                     <button style={s.btnSm} onClick={() => document.getElementById('mapUpload')?.click()}>
@@ -453,6 +455,12 @@ async function loadLogs() {
                       }} />
                   </div>
                   {worldMap && <img src={worldMap} alt="Map preview" style={{ width: '100%', borderRadius: 6, border: '1px solid rgba(201,147,58,0.2)', marginBottom: 10 }} />}
+                  <div style={{ display: 'flex', gap: 10, marginTop: 4, alignItems: 'center' }}>
+                    <button style={s.btnPrimary} onClick={saveWorld} disabled={saving}>
+                      {saving ? 'Saving...' : activeWorldId ? '💾 Save World' : '✨ Create World'}
+                    </button>
+                    {saveMsg && <span style={{ fontSize: 13, color: saveMsg.startsWith('✓') ? '#5aaa5a' : '#c04040' }}>{saveMsg}</span>}
+                  </div>
                 </div>
                 <div style={s.card}>
                   <div style={s.cardTitle}>📊 Campaign Stats</div>
@@ -467,6 +475,8 @@ async function loadLogs() {
                   {activeWorld && <p style={{ fontSize: 12, color: '#5a4a30', marginTop: 12, fontStyle: 'italic' }}>Last updated: {new Date(activeWorld.updated_at).toLocaleDateString()}</p>}
                 </div>
               </div>
+
+              {/* Canon Text Editor */}
               <div style={{ ...s.card, marginTop: 16 }}>
                 <div style={s.cardTitle}>📜 World Canon Text</div>
                 <p style={{ fontSize: 13, color: '#7a6a50', fontStyle: 'italic', marginBottom: 10 }}>
@@ -477,9 +487,124 @@ async function loadLogs() {
                   placeholder="Paste your world canon here..." />
                 <div style={{ display: 'flex', gap: 10, marginTop: 10, alignItems: 'center' }}>
                   <button style={s.btnPrimary} onClick={saveWorld} disabled={saving}>
-                    {saving ? 'Saving...' : activeWorldId ? '💾 Save World' : '✨ Create World'}
+                    {saving ? 'Saving...' : activeWorldId ? '💾 Save Canon' : '✨ Create World'}
                   </button>
                   {saveMsg && <span style={{ fontSize: 13, color: saveMsg.startsWith('✓') ? '#5aaa5a' : '#c04040' }}>{saveMsg}</span>}
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div style={{ borderTop: '1px solid rgba(201,147,58,0.15)', margin: '28px 0 24px', position: 'relative' }}>
+                <span style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)', background: '#0d0a07', padding: '0 16px', fontSize: 11, color: '#5a4a30', letterSpacing: '0.15em', textTransform: 'uppercase' as any }}>
+                  World Builder
+                </span>
+              </div>
+              <p style={{ fontSize: 15, color: '#7a6a50', fontStyle: 'italic', marginBottom: 20 }}>Chat with Claude to develop your world lore. Commit anything worth keeping directly to your canon.</p>
+
+              {/* World Builder Chat + Lore Preview */}
+              <div style={s.grid2}>
+                <div>
+                  <div style={{ ...s.card, display: 'flex', flexDirection: 'column', height: 520 }}>
+                    <div style={s.cardTitle}>💬 World Building Chat</div>
+                    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12 }}>
+                      {wbMessages.length === 0 && (
+                        <div style={{ padding: '20px 0', textAlign: 'center' as any }}>
+                          <p style={{ fontSize: 13, color: '#7a6a50', fontStyle: 'italic' }}>
+                            Start by telling Claude about your world. What is the setting? What makes it unique? What are you trying to build?
+                          </p>
+                        </div>
+                      )}
+                      {wbMessages.map((m, i) => (
+                        <div key={i} style={{ display: 'flex', gap: 8, flexDirection: m.role === 'user' ? 'row-reverse' : 'row', alignItems: 'flex-start' }}>
+                          <div style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, background: m.role === 'user' ? 'rgba(201,147,58,0.15)' : '#1a3a1a', border: `1px solid ${m.role === 'user' ? 'rgba(201,147,58,0.3)' : 'rgba(58,122,58,0.4)'}`, color: m.role === 'user' ? '#e8b86d' : '#5aaa5a' }}>
+                            {m.role === 'user' ? 'DM' : 'AI'}
+                          </div>
+                          <div style={{ maxWidth: '80%', padding: '10px 14px', borderRadius: 10, fontSize: 13, lineHeight: 1.7, background: m.role === 'user' ? 'rgba(201,147,58,0.09)' : '#1a1206', border: `1px solid ${m.role === 'user' ? 'rgba(201,147,58,0.2)' : 'rgba(58,122,58,0.2)'}`, color: '#e8dcc8', whiteSpace: 'pre-wrap' as any }}>
+                            {m.content}
+                          </div>
+                        </div>
+                      ))}
+                      {wbLoading && (
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                          <div style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, background: '#1a3a1a', border: '1px solid rgba(58,122,58,0.4)', color: '#5aaa5a' }}>AI</div>
+                          <div style={{ padding: '10px 14px', borderRadius: 10, fontSize: 13, background: '#1a1206', border: '1px solid rgba(58,122,58,0.2)', color: '#5a4a30', fontStyle: 'italic' }}>Thinking...</div>
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <textarea
+                        style={{ ...s.input, margin: 0, flex: 1, height: 42, resize: 'none' as any }}
+                        value={wbInput}
+                        onChange={e => setWbInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendWorldBuilder() } }}
+                        placeholder="Tell Claude about your world..."
+                        disabled={wbLoading || !activeWorldId}
+                      />
+                      <button style={{ ...s.btnSm, height: 42, padding: '0 14px' }} onClick={sendWorldBuilder} disabled={wbLoading || !activeWorldId}>➤</button>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                    <button style={{ ...s.btnPrimary, flex: 1 }}
+                      onClick={previewCommit}
+                      disabled={!wbLastExchange || wbPreviewLoading}>
+                      {wbPreviewLoading ? 'Extracting lore...' : '📋 Preview Lore Commit'}
+                    </button>
+                    <button style={s.btnSm} onClick={() => { setWbMessages([]); setWbLastExchange(null); setWbPreview(null); setWbSaveMsg('') }}>
+                      Clear Chat
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  {wbPreview && wbPreview.length > 0 ? (
+                    <div style={s.card}>
+                      <div style={s.cardTitle}>📋 Lore Preview</div>
+                      <p style={{ fontSize: 12, color: '#7a6a50', fontStyle: 'italic', marginBottom: 14 }}>
+                        Review what will be added to your world canon. Edit if needed, then commit.
+                      </p>
+                      {wbPreview.map((entry: any, i: number) => (
+                        <div key={i} style={{ marginBottom: 16 }}>
+                          <div style={{ fontSize: 11, color: '#c9933a', letterSpacing: '0.1em', textTransform: 'uppercase' as any, marginBottom: 6 }}>
+                            {entry.section.replace('## ', '')}
+                          </div>
+                          <textarea
+                            style={{ ...s.input, height: 80, resize: 'vertical' as any, fontSize: 13, fontFamily: 'monospace', margin: 0 }}
+                            value={entry.content}
+                            onChange={e => setWbPreview((prev: any) => prev.map((p: any, pi: number) => pi === i ? { ...p, content: e.target.value } : p))}
+                          />
+                        </div>
+                      ))}
+                      <button style={s.btnPrimary} onClick={saveLore} disabled={wbSaving}>
+                        {wbSaving ? 'Committing...' : '✨ Commit to World Canon'}
+                      </button>
+                      {wbSaveMsg && <p style={{ fontSize: 13, color: '#5aaa5a', marginTop: 8 }}>{wbSaveMsg}</p>}
+                    </div>
+                  ) : (
+                    <div style={{ ...s.card, display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, flexDirection: 'column', gap: 12 }}>
+                      {wbPreview && wbPreview.length === 0
+                        ? <p style={{ fontSize: 14, color: '#c04040', fontStyle: 'italic', textAlign: 'center' as any }}>No concrete lore found in that exchange. Keep chatting and try again.</p>
+                        : <p style={{ fontSize: 15, color: '#5a4a30', fontStyle: 'italic', textAlign: 'center' as any }}>Chat with Claude to develop lore, then click "Preview Lore Commit" to see what will be saved.</p>
+                      }
+                      {wbSaveMsg && <p style={{ fontSize: 13, color: '#5aaa5a' }}>{wbSaveMsg}</p>}
+                    </div>
+                  )}
+
+                  <div style={{ ...s.card, marginTop: 14 }}>
+                    <div style={s.cardTitle}>📜 Current Canon Sections</div>
+                    {canonText ? (
+                      <div>
+                        {['## GEOGRAPHY & LOCATIONS', '## FACTIONS & ORGANIZATIONS', '## NPCS & CHARACTERS', '## HISTORY & TIMELINE', '## MAGIC & MECHANICS', '## CULTURE & SOCIETY', '## DM ONLY — SECRETS & MYSTERIES'].map(section => (
+                          <div key={section} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid rgba(201,147,58,0.08)', fontSize: 12 }}>
+                            <span style={{ color: canonText.includes(section) ? '#e8b86d' : '#5a4a30' }}>
+                              {canonText.includes(section) ? '✓' : '○'} {section.replace('## ', '')}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p style={s.empty}>No canon yet. Start chatting to build your world.</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -811,119 +936,7 @@ async function loadLogs() {
             </div>
           )}
 
-{tab === 'builder' && (
-            <div>
-              <h1 style={s.pageTitle}>World Builder</h1>
-              <p style={s.pageSub}>Chat with Claude to develop your world lore. Commit anything worth keeping directly to your canon.</p>
-              {!activeWorldId && <div style={s.warning}>⚠ Create a world first.</div>}
 
-              <div style={s.grid2}>
-                <div>
-                  <div style={{ ...s.card, display: 'flex', flexDirection: 'column', height: 520 }}>
-                    <div style={s.cardTitle}>💬 World Building Chat</div>
-                    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12 }}>
-                      {wbMessages.length === 0 && (
-                        <div style={{ padding: '20px 0', textAlign: 'center' as any }}>
-                          <p style={{ fontSize: 13, color: '#7a6a50', fontStyle: 'italic' }}>
-                            Start by telling Claude about your world. What is the setting? What makes it unique? What are you trying to build?
-                          </p>
-                        </div>
-                      )}
-                      {wbMessages.map((m, i) => (
-                        <div key={i} style={{ display: 'flex', gap: 8, flexDirection: m.role === 'user' ? 'row-reverse' : 'row', alignItems: 'flex-start' }}>
-                          <div style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, background: m.role === 'user' ? 'rgba(201,147,58,0.15)' : '#1a3a1a', border: `1px solid ${m.role === 'user' ? 'rgba(201,147,58,0.3)' : 'rgba(58,122,58,0.4)'}`, color: m.role === 'user' ? '#e8b86d' : '#5aaa5a' }}>
-                            {m.role === 'user' ? 'DM' : 'AI'}
-                          </div>
-                          <div style={{ maxWidth: '80%', padding: '10px 14px', borderRadius: 10, fontSize: 13, lineHeight: 1.7, background: m.role === 'user' ? 'rgba(201,147,58,0.09)' : '#1a1206', border: `1px solid ${m.role === 'user' ? 'rgba(201,147,58,0.2)' : 'rgba(58,122,58,0.2)'}`, color: '#e8dcc8', whiteSpace: 'pre-wrap' as any }}>
-                            {m.content}
-                          </div>
-                        </div>
-                      ))}
-                      {wbLoading && (
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                          <div style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, background: '#1a3a1a', border: '1px solid rgba(58,122,58,0.4)', color: '#5aaa5a' }}>AI</div>
-                          <div style={{ padding: '10px 14px', borderRadius: 10, fontSize: 13, background: '#1a1206', border: '1px solid rgba(58,122,58,0.2)', color: '#5a4a30', fontStyle: 'italic' }}>Thinking...</div>
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <textarea
-                        style={{ ...s.input, margin: 0, flex: 1, height: 42, resize: 'none' as any }}
-                        value={wbInput}
-                        onChange={e => setWbInput(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendWorldBuilder() } }}
-                        placeholder="Tell Claude about your world..."
-                        disabled={wbLoading || !activeWorldId}
-                      />
-                      <button style={{ ...s.btnSm, height: 42, padding: '0 14px' }} onClick={sendWorldBuilder} disabled={wbLoading || !activeWorldId}>➤</button>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                    <button style={{ ...s.btnPrimary, flex: 1 }}
-                      onClick={previewCommit}
-                      disabled={!wbLastExchange || wbPreviewLoading}>
-                      {wbPreviewLoading ? 'Extracting lore...' : '📋 Preview Lore Commit'}
-                    </button>
-                    <button style={s.btnSm} onClick={() => { setWbMessages([]); setWbLastExchange(null); setWbPreview(null); setWbSaveMsg('') }}>
-                      Clear Chat
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  {wbPreview ? (
-                    <div style={s.card}>
-                      <div style={s.cardTitle}>📋 Lore Preview</div>
-                      <p style={{ fontSize: 12, color: '#7a6a50', fontStyle: 'italic', marginBottom: 14 }}>
-                        Review what will be added to your world canon. Edit if needed, then commit.
-                      </p>
-                      {wbPreview.map((entry: any, i: number) => (
-                        <div key={i} style={{ marginBottom: 16 }}>
-                          <div style={{ fontSize: 11, color: '#c9933a', letterSpacing: '0.1em', textTransform: 'uppercase' as any, marginBottom: 6 }}>
-                            {entry.section.replace('## ', '')}
-                          </div>
-                          <textarea
-                            style={{ ...s.input, height: 80, resize: 'vertical' as any, fontSize: 13, fontFamily: 'monospace', margin: 0 }}
-                            value={entry.content}
-                            onChange={e => setWbPreview((prev: any) => prev.map((p: any, pi: number) => pi === i ? { ...p, content: e.target.value } : p))}
-                          />
-                        </div>
-                      ))}
-                      <button style={s.btnPrimary} onClick={saveLore} disabled={wbSaving}>
-                        {wbSaving ? 'Committing...' : '✨ Commit to World Canon'}
-                      </button>
-                      {wbSaveMsg && <p style={{ fontSize: 13, color: '#5aaa5a', marginTop: 8 }}>{wbSaveMsg}</p>}
-                    </div>
-                  ) : (
-                    <div style={{ ...s.card, display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, flexDirection: 'column', gap: 12 }}>
-                      <p style={{ fontSize: 15, color: '#5a4a30', fontStyle: 'italic', textAlign: 'center' as any }}>
-                        Chat with Claude to develop lore, then click "Preview Lore Commit" to see what will be saved.
-                      </p>
-                      {wbSaveMsg && <p style={{ fontSize: 13, color: '#5aaa5a' }}>{wbSaveMsg}</p>}
-                    </div>
-                  )}
-
-                  <div style={{ ...s.card, marginTop: 14 }}>
-                    <div style={s.cardTitle}>📜 Current Canon Sections</div>
-                    {canonText ? (
-                      <div>
-                        {['## GEOGRAPHY & LOCATIONS', '## FACTIONS & ORGANIZATIONS', '## NPCS & CHARACTERS', '## HISTORY & TIMELINE', '## MAGIC & MECHANICS', '## CULTURE & SOCIETY', '## DM ONLY — SECRETS & MYSTERIES'].map(section => (
-                          <div key={section} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid rgba(201,147,58,0.08)', fontSize: 12 }}>
-                            <span style={{ color: canonText.includes(section) ? '#e8b86d' : '#5a4a30' }}>
-                              {canonText.includes(section) ? '✓' : '○'} {section.replace('## ', '')}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p style={s.empty}>No canon yet. Start chatting to build your world.</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
           
           {tab === 'logs' && (
             <div>
