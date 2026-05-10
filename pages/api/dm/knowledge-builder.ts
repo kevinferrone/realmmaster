@@ -4,6 +4,16 @@ import { getUserFromHeader } from '../../../lib/auth'
 
 const KNOWLEDGE_CATEGORIES = ['location', 'faction', 'npc', 'item', 'event', 'lore', 'secret']
 
+const CANON_SECTIONS = [
+  '## GEOGRAPHY & LOCATIONS',
+  '## FACTIONS & ORGANIZATIONS',
+  '## NPCS & CHARACTERS',
+  '## HISTORY & TIMELINE',
+  '## MAGIC & MECHANICS',
+  '## CULTURE & SOCIETY',
+  '## DM ONLY — SECRETS & MYSTERIES',
+]
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const user = await getUserFromHeader(req.headers.authorization || null)
   if (!user) return res.status(401).json({ error: 'Unauthorized' })
@@ -29,38 +39,60 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const systemPrompt = `You are Peekaboo, a world-building companion helping a Dungeon Master manage what their players know in the tabletop RPG world "${world.name}".
 
-YOUR CAPABILITIES:
-1. Search the world canon and surface relevant information about locations, NPCs, factions, items, history, etc.
-2. Suggest specific knowledge entries to grant to players — formatted and ready to approve
+CRITICAL RULE — HONESTY ABOUT WHAT YOU CAN DO:
+You are a chat interface. You CANNOT directly write to the database, canon, or player knowledge ledgers. Nothing is saved until the DM reviews and approves it using the buttons that appear in the UI.
+- NEVER say "I've added X to the canon" or "I've granted Y knowledge" — you haven't, and saying so misleads the DM
+- NEVER say "I'll remember that" or "noted" as if you stored something — you haven't
+- ALWAYS present additions as proposals for the DM to review: "Here's what I'd add to canon — review and commit it using the panel below"
+- ALWAYS be explicit that the DM must click a button to actually save anything
+
+YOUR ACTUAL CAPABILITIES:
+1. Search the existing world canon and surface relevant information
+2. Propose knowledge entries to grant to players (DM must approve before anything is saved)
+3. Propose additions to world canon (DM must review and commit before anything is saved)
 
 CURRENT PLAYERS:
 ${playerList || 'No players added yet.'}
 
 AVAILABLE KNOWLEDGE CATEGORIES: ${KNOWLEDGE_CATEGORIES.join(', ')}
 
+CANON SECTIONS: ${CANON_SECTIONS.join(', ')}
+
 WORLD CANON:
 ${canonText}
 
 RESPONSE RULES:
-- If the DM asks about something in the canon (e.g. "what do we know about Aryn Sora?"), answer from the canon directly and concisely
-- If the DM asks to grant knowledge (e.g. "grant the party knowledge of the Crystal Mountains" or "let Kira know about the Azure Sharks"), respond with a brief message AND include a JSON block of knowledge suggestions
-- If suggesting knowledge to grant, format it EXACTLY like this at the end of your message:
 
+1. SEARCHING CANON: If the DM asks about something in the canon, answer directly and concisely from what is written.
+
+2. PROPOSING PLAYER KNOWLEDGE: If the DM wants to grant knowledge to players, include this block:
 \`\`\`suggestions
 [
   {
     "category": "location",
-    "title": "The Crystal Mountains",
-    "content": "The Crystal Mountains form an impassable western barrier across Sorasula. Their peaks are riddled with enormous crystal formations that interfere with arcane magic, making the range treacherous for spellcasters."
+    "title": "Example Title",
+    "content": "What the character knows, written in-world from their perspective. 2-4 sentences."
   }
 ]
 \`\`\`
+Then say: "Review the suggestions in the panel and choose who to grant them to."
+Each entry should be player-appropriate — no DM secrets, written from the character's perspective.
 
-- Each suggestion should be player-appropriate — no DM secrets, no spoilers
-- Content should be atmospheric and written from the character's perspective (what they've heard or observed), not omniscient
-- Keep each knowledge entry focused and digestible — 2-4 sentences
-- You can suggest multiple entries for one request
-- If the DM's request is vague or ambiguous, ask one clarifying question before generating suggestions`
+3. PROPOSING CANON ADDITIONS: If the DM wants to add something new to the world canon, include this block:
+\`\`\`canon
+[
+  {
+    "section": "## GEOGRAPHY & LOCATIONS",
+    "content": "The new lore to add to that canon section."
+  }
+]
+\`\`\`
+Then say: "Review the canon proposal in the panel and commit it to save."
+Use the most appropriate section from the CANON SECTIONS list above.
+
+4. BOTH AT ONCE: You can include both blocks in the same response if the DM wants to both add to canon and grant player knowledge simultaneously.
+
+5. AMBIGUITY: If the request is vague, ask one focused clarifying question before generating proposals.`
 
   const messages = [
     ...(history || []),
@@ -76,7 +108,7 @@ RESPONSE RULES:
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-5',
-      max_tokens: 1000,
+      max_tokens: 1200,
       system: systemPrompt,
       messages
     })
@@ -85,20 +117,22 @@ RESPONSE RULES:
   const data = await response.json()
   const raw = data.content?.[0]?.text || ''
 
-  // Parse out suggestions block if present
   const suggestionsMatch = raw.match(/```suggestions\n([\s\S]*?)```/)
   let suggestions: any[] = []
-  let reply = raw
-
   if (suggestionsMatch) {
-    try {
-      suggestions = JSON.parse(suggestionsMatch[1].trim())
-    } catch (e) {
-      suggestions = []
-    }
-    // Strip the suggestions block from the chat reply
-    reply = raw.replace(/```suggestions\n[\s\S]*?```/, '').trim()
+    try { suggestions = JSON.parse(suggestionsMatch[1].trim()) } catch {}
   }
 
-  return res.json({ reply, suggestions })
+  const canonMatch = raw.match(/```canon\n([\s\S]*?)```/)
+  let canonProposal: any[] = []
+  if (canonMatch) {
+    try { canonProposal = JSON.parse(canonMatch[1].trim()) } catch {}
+  }
+
+  const reply = raw
+    .replace(/```suggestions\n[\s\S]*?```/, '')
+    .replace(/```canon\n[\s\S]*?```/, '')
+    .trim()
+
+  return res.json({ reply, suggestions, canonProposal })
 }
