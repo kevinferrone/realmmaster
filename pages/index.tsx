@@ -437,7 +437,22 @@ async function loadLogs() {
             ))}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {activeWorld && <span style={s.worldBadge}>{activeWorld.name}</span>}
+            {worlds.length > 0 && (
+              <select
+                value={activeWorldId || ''}
+                onChange={e => {
+                  const w = worlds.find(x => x.id === e.target.value)
+                  if (!w) return
+                  setActiveWorldId(w.id)
+                  setWorldName(w.name)
+                  setWorldDesc(w.description || '')
+                  setCanonText(w.canon_text || '')
+                  setWorldMap(w.map_image_url || '')
+                }}
+                style={{ fontSize: 11, padding: '3px 8px', border: '1px solid rgba(201,147,58,0.3)', borderRadius: 4, color: '#c9933a', background: '#0d0a07', cursor: 'pointer' }}>
+                {worlds.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+              </select>
+            )}
             <a href={`/map?worldId=${activeWorldId || ''}`} style={{ textDecoration: 'none' }}>
               <button style={s.btnSm}>🗺 Map</button>
             </a>
