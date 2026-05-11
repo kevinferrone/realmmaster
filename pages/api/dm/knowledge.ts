@@ -53,7 +53,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         category,
         title,
         content,
-        source: 'dm_granted'
+        source: 'dm_granted',
+is_active: true
       }).select().single()
 
       if (error) return res.status(500).json({ error: error.message })
@@ -81,7 +82,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         category,
         title,
         content,
-        source: 'dm_granted'
+        source: 'dm_granted',
+is_active: true
       }))
 
       const { error } = await db.from('character_knowledge').insert(entries)
