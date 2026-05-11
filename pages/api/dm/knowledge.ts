@@ -54,7 +54,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         title,
         content,
         source: 'dm_granted',
-is_active: true
+        is_active: true          // ← fix: memory.ts filters on is_active = true
       }).select().single()
 
       if (error) return res.status(500).json({ error: error.message })
@@ -83,7 +83,7 @@ is_active: true
         title,
         content,
         source: 'dm_granted',
-is_active: true
+        is_active: true          // ← fix: same for party grants
       }))
 
       const { error } = await db.from('character_knowledge').insert(entries)
