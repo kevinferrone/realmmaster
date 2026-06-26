@@ -313,12 +313,7 @@ export default function PlayerPortal() {
                       ⭐ {renownLevel.level} · {renown.available} pts available
                     </span>
                   )}
-                  {sessionId && !sessionEnded && (
-                    <button style={{ ...s.btnSm, borderColor: '#8b2020', color: '#c04040' }} onClick={endSession} disabled={sessionEnding}>
-                      {sessionEnding ? 'Saving...' : '📖 End & Summarize Session'}
-                    </button>
-                  )}
-                  {sessionEnded && <button style={s.btnSm} onClick={newSession}>▶ New Session</button>}
+        
                 </div>
               </div>
               <p style={s.sub}>Answering as <em>{charName || 'an unnamed adventurer'}</em> — only what your character would know.</p>
@@ -363,9 +358,7 @@ export default function PlayerPortal() {
                   <button style={{ ...s.sendBtn, opacity: chatLoading || sessionEnded ? 0.4 : 1 }} onClick={sendMessage} disabled={chatLoading || sessionEnded}>➤</button>
                 </div>
               </div>
-              <p style={{ fontSize: 12, color: '#5a4a30', textAlign: 'center' as any, marginTop: 10, fontStyle: 'italic' }}>
-                Click "End & Summarize Session" when done to save your progress.
-              </p>
+              
             </div>
           )}
 
