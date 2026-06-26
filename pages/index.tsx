@@ -456,10 +456,10 @@ async function loadLogs() {
             <a href={`/map?worldId=${activeWorldId || ''}`} style={{ textDecoration: 'none' }}>
               <button style={s.btnSm}>🗺 Map</button>
             </a>
-                        <a href="/dm/chronicle" style={{ textDecoration: 'none' }}>
+                                    <a href="/dm/chronicle" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
               <button style={s.btnSm}>📜 Chronicle</button>
             </a>
-                        <a href="/dm/gm-chat" style={{ textDecoration: 'none' }}>
+                                    <a href="/dm/gm-chat" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
               <button style={s.btnSm}>🔮 GM Assistant</button>
             </a>
             <button style={s.btnSm} onClick={() => getSupabaseBrowser().auth.signOut()}>Sign Out</button>
