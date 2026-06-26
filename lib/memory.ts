@@ -120,71 +120,7 @@ export async function buildPlayerMemory(token: string): Promise<PlayerMemory | n
   }
 }
 
-export function buildSystemPrompt(memory: PlayerMemory): string {
-  const { player, world, sessionSummaries, knowledgeLedger } = memory
-
-  const byCategory: Record<string, typeof knowledgeLedger> = {}
-  for (const k of knowledgeLedger) {
-    if (!byCategory[k.category]) byCategory[k.category] = []
-    byCategory[k.category].push(k)
-  }
-
-  const knowledgeBlock = Object.entries(byCategory).map(([cat, items]) =>
-    `${cat.toUpperCase()}:\n${items.map(i => `  - ${i.title}: ${i.content}`).join('\n')}`
-  ).join('\n\n')
-
-  const charContext = player.character_name ? `CHARACTER:
-  Name: ${player.character_name}
-  Class/Race: ${player.character_class || 'Unknown'}
-  Background: ${player.character_background || 'Not provided'}
-  Starting knowledge: ${player.character_knowledge || 'Not specified'}
-  ${player.character_sheet_text ? `\nCharacter sheet:\n${player.character_sheet_text.slice(0, 1500)}` : ''}` : 'No character set up.'
-
-  const renownTransactionLog = memory.renownTransactions.length > 0
-    ? `\n  Deeds that earned renown:\n${memory.renownTransactions.map(t => `    - ${t}`).join('\n')}`
-    : ''
-
-  const renownBlock = `RENOWN STATUS:
-  Level: ${memory.renownLevel}
-  Description: ${memory.renownDescription}
-  Points Used: ${memory.renownUsed}
-  Points Available: ${memory.renownAvailable}${renownTransactionLog}`
-
-  const memoryBlock = sessionSummaries ? `CAMPAIGN HISTORY:\n${sessionSummaries}` : ''
-
-  const ledgerBlock = knowledgeLedger.length > 0 ? `KNOWLEDGE LEDGER:\n${knowledgeBlock}` : ''
-
-  return `You are a READ-ONLY knowledge reference for a D&D character. You do NOT run scenes, tell stories, or act as a game master.
-
-YOUR ONLY JOB: When asked a question, look up what this character knows from the sources below and report it in 1-3 short sentences. That is all.
-
-HARD RULES — violating these is a failure:
-- Do NOT narrate scenes or describe what the character sees or experiences
-- Do NOT invent, infer, or extrapolate any information not explicitly listed below
-- Do NOT ask the player questions or suggest what they should do
-- Do NOT reveal world lore unless it appears explicitly in the character's knowledge ledger or background
-- Do NOT write more than 3 sentences under any circumstances
-- If the character does not know something, say: "Your character has no record of that." Then stop.
-
-SOURCES YOU MAY DRAW FROM (only these, nothing else):
-1. Character background and starting knowledge listed below
-2. Knowledge ledger entries listed below
-3. Renown deeds listed below
-4. Session history summaries listed below
-
-Do not use the world canon to answer player questions. The world canon is provided only so you can verify whether a ledger entry is consistent. Players must earn knowledge through play.
-
-WORLD: ${world.name}
-${world.description || ''}
-
-${(() => {
-  const canon = world.canon_text || ''
-  const splitMarker = '## DM ONLY'
-  const publicCanon = canon.includes(splitMarker)
-    ? canon.split(splitMarker)[0].trim()
-    : canon
-  return `WORLD CANON (public knowledge only - do not reveal secrets):\n${publicCanon || 'No canon uploaded yet.'}`
-})()}
+)()}
 
 ${charContext}
 
