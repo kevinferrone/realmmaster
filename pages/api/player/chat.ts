@@ -23,6 +23,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     currentSessionId = newSession?.id
   }
 
+  // History scoped to THIS session only (fetched before inserting the new message),
+  // so prior sessions' answers can never carry over and poison a fresh chat.
+  const { data: priorMsgs } = await db
+    .from('messages')
+    .select('role, content')
+    .eq('session_id', currentSessionId)
+    .order('created_at', { ascending: true })
+    .limit(20)
+
   await db.from('messages').insert({
     player_id: player.id,
     world_id: world.id,
@@ -32,13 +41,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   })
 
   const conversationMessages = [
-    ...memory.recentMessages.map(m => ({
+    ...(priorMsgs || []).map(m => ({
       role: m.role as 'user' | 'assistant',
       content: m.content
     })),
     { role: 'user' as const, content: message }
   ]
-  
+
   const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -57,8 +66,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const responseText = await anthropicRes.text()
 
   if (!anthropicRes.ok) {
-    return res.status(500).json({ 
-      error: 'Anthropic API error', 
+    return res.status(500).json({
+      error: 'Anthropic API error',
       status: anthropicRes.status,
       details: responseText
     })
