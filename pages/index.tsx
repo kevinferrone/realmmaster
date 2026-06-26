@@ -472,7 +472,7 @@ async function loadLogs() {
             <div>
               <h1 style={s.pageTitle}>Worlds</h1>
               <p style={s.pageSub}>Manage your world settings and canon. Chat with Peekaboo to build new lore.</p>
-              {!activeWorldId && <div style={s.warning}>⚠ Create a world first.</div>}
+      
 
               <div style={s.grid2}>
 
