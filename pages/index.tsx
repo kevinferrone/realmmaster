@@ -485,7 +485,7 @@ async function loadLogs() {
                         <label style={s.label}>Active World</label>
                         <select style={s.select} value={activeWorldId || ''}
                           onChange={e => {
-                            if (e.target.value === 'new') { setActiveWorldId(null); setWorldName(''); setWorldDesc(''); setCanonText('') }
+                            if (e.target.value === 'new') { setActiveWorldId(null); setWorldName(''); setWorldDesc(''); setCanonText('') ; setWorldMap('') }
                             else { setActiveWorldId(e.target.value); const w = worlds.find(x => x.id === e.target.value); if (w) { setWorldName(w.name); setWorldDesc(w.description || ''); setCanonText(w.canon_text || ''); setWorldMap(w.map_image_url || '') } }
                           }}>
                           {worlds.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
@@ -506,7 +506,8 @@ async function loadLogs() {
                       <input type="file" id="mapUpload" accept="image/*" style={{ display: 'none' }}
                         onChange={async e => {
                           const file = e.target.files?.[0]
-                          if (!file || !activeWorldId) return
+                          if (!file) return
+                          if (!activeWorldId) { setSaveMsg('⚠ Save the world first, then upload a map.'); return }
                           setMapUploading(true)
                           const form = new FormData()
                           form.append('worldId', activeWorldId)
