@@ -550,6 +550,47 @@ export default function MapPage() {
                       }
                     </div>
 
+                                        <div style={{ marginTop: 14, borderTop: '1px solid rgba(201,147,58,0.15)', paddingTop: 14 }}>
+                      <div style={s.panelTitle}>🔓 Reveal Lore To</div>
+                      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                        <button style={{ ...s.btnSm, ...(revealTarget === 'player' ? { background: 'rgba(201,147,58,0.15)', borderColor: '#c9933a', color: '#e8b86d' } : {}) }}
+                          onClick={() => setRevealTarget('player')}>Player</button>
+                        <button style={{ ...s.btnSm, ...(revealTarget === 'party' ? { background: 'rgba(201,147,58,0.15)', borderColor: '#c9933a', color: '#e8b86d' } : {}) }}
+                          onClick={() => setRevealTarget('party')}>Party</button>
+                      </div>
+
+                      {revealTarget === 'player' && (
+                        <select style={s.select} value={revealPlayer} onChange={e => setRevealPlayer(e.target.value)}>
+                          <option value="">Select player...</option>
+                          {players.map(p => {
+                            const revealed = isPinRevealed(selectedPin.id, p.id)
+                            return <option key={p.id} value={p.id}>{p.character_name || p.name}{revealed ? ' ✓' : ''}</option>
+                          })}
+                        </select>
+                      )}
+
+                      {revealTarget === 'party' && (
+                        <select style={s.select} value={revealParty} onChange={e => setRevealParty(e.target.value)}>
+                          <option value="">Select party...</option>
+                          {parties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                      )}
+
+                      <button style={s.btnPrimary} onClick={revealLore} disabled={!selectedPin.lore}>
+                        🔓 Reveal Lore
+                      </button>
+                      {!selectedPin.lore && <p style={{ fontSize: 11, color: '#5a4a30', fontStyle: 'italic', marginTop: 4 }}>Add lore to this pin before revealing.</p>}
+                      {revealMsg && <p style={{ fontSize: 13, color: revealMsg.startsWith('✓') ? '#5aaa5a' : '#c04040', marginTop: 8 }}>{revealMsg}</p>}
+
+                      {reveals.filter(r => r.location_id === selectedPin.id).length > 0 && (
+                        <div style={{ marginTop: 12 }}>
+                          <div style={{ fontSize: 11, color: '#7a6a50', textTransform: 'uppercase' as any, letterSpacing: '0.1em', marginBottom: 6 }}>Revealed To</div>
+                          {players.filter(p => isPinRevealed(selectedPin.id, p.id)).map(p => (
+                            <div key={p.id} style={{ fontSize: 12, color: '#5aaa5a', marginBottom: 3 }}>✓ {p.character_name || p.name}</div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
 
                   </>
                 )}
