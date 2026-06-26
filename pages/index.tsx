@@ -456,6 +456,9 @@ async function loadLogs() {
             <a href={`/map?worldId=${activeWorldId || ''}`} style={{ textDecoration: 'none' }}>
               <button style={s.btnSm}>🗺 Map</button>
             </a>
+                        <a href="/dm/chronicle" style={{ textDecoration: 'none' }}>
+              <button style={s.btnSm}>📜 Chronicle</button>
+            </a>
             <button style={s.btnSm} onClick={() => getSupabaseBrowser().auth.signOut()}>Sign Out</button>
           </div>
         </nav>
