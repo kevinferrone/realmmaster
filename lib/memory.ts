@@ -120,13 +120,75 @@ export async function buildPlayerMemory(token: string): Promise<PlayerMemory | n
   }
 }
 
-)()}
+export function buildSystemPrompt(memory: PlayerMemory): string {
+  const { player, world, sessionSummaries, knowledgeLedger } = memory
+
+  const byCategory: Record<string, typeof knowledgeLedger> = {}
+  for (const k of knowledgeLedger) {
+    if (!byCategory[k.category]) byCategory[k.category] = []
+    byCategory[k.category].push(k)
+  }
+
+  const knowledgeBlock = Object.entries(byCategory).map(([cat, items]) =>
+    `${cat.toUpperCase()}:\n${items.map(i => `  - ${i.title}: ${i.content}`).join('\n')}`
+  ).join('\n\n')
+
+  const charContext = player.character_name ? `CHARACTER:
+  Name: ${player.character_name}
+  Class/Race: ${player.character_class || 'Unknown'}
+  Background: ${player.character_background || 'Not provided'}
+  Starting knowledge: ${player.character_knowledge || 'Not specified'}
+  ${player.character_sheet_text ? `\nCharacter sheet:\n${player.character_sheet_text.slice(0, 1500)}` : ''}` : 'No character set up.'
+
+  const renownTransactionLog = memory.renownTransactions.length > 0
+    ? `\n  Deeds that earned renown:\n${memory.renownTransactions.map(t => `    - ${t}`).join('\n')}`
+    : ''
+
+  const renownBlock = `RENOWN STATUS:
+  Level: ${memory.renownLevel}
+  Description: ${memory.renownDescription}
+  Points Used: ${memory.renownUsed}
+  Points Available: ${memory.renownAvailable}${renownTransactionLog}`
+
+  const memoryBlock = sessionSummaries ? `CAMPAIGN HISTORY:\n${sessionSummaries}` : ''
+
+  const ledgerBlock = knowledgeLedger.length > 0
+    ? `KNOWLEDGE LEDGER (everything your character has learned through play — THIS IS YOUR PRIMARY SOURCE):\n${knowledgeBlock}`
+    : 'KNOWLEDGE LEDGER: (empty — nothing recorded yet)'
+
+  const canon = world.canon_text || ''
+  const splitMarker = '## DM ONLY'
+  const publicCanon = canon.includes(splitMarker) ? canon.split(splitMarker)[0].trim() : canon
+
+  return `You are a READ-ONLY knowledge reference for a D&D character. You do NOT run scenes, tell stories, or act as a game master.
+
+YOUR ONLY JOB: When the player asks what their character knows, look it up in the sections below and report it in 1-3 short sentences.
+
+HOW TO ANSWER:
+- To answer "who/what/where is X" or "tell me about X", SEARCH the CHARACTER, KNOWLEDGE LEDGER, CAMPAIGN HISTORY, and RENOWN sections below and report what they say. These are the authoritative record of what this character personally knows.
+- Match by meaning, not exact wording (a question about "Old Issa" matches a ledger entry titled "Old Issa (Hermit)").
+- Only respond "Your character has no record of that." if X genuinely does NOT appear in any of those sections. Never say this if a matching entry exists.
+
+HARD RULES — violating these is a failure:
+- Do NOT narrate scenes or describe what the character sees or experiences.
+- Do NOT invent, infer, or extrapolate anything not in the sections below.
+- Do NOT ask the player questions or suggest what they should do.
+- Do NOT write more than 3 sentences.
+
+=== THE AUTHORITATIVE RECORD OF WHAT YOUR CHARACTER KNOWS ===
 
 ${charContext}
 
-${renownBlock}
+${ledgerBlock}
 
 ${memoryBlock}
 
-${ledgerBlock}`
+${renownBlock}
+
+=== WORLD CANON — BACKGROUND REFERENCE ONLY ===
+Do NOT use this to decide whether the character knows something. A place or person existing in canon does NOT mean this character knows it — only the sections above count. Use canon only to keep wording consistent with established lore, and never reveal canon the character hasn't learned above.
+WORLD: ${world.name}
+${world.description || ''}
+
+${publicCanon || 'No canon uploaded yet.'}`
 }
