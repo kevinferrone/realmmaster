@@ -73,6 +73,15 @@ export default function MapPage() {
   const [measureCur, setMeasureCur] = useState<{ x: number, y: number } | null>(null)
   const [mapGuideMsg, setMapGuideMsg] = useState('')
 
+  // Zoom + pan
+  const [zoom, setZoom] = useState(1)
+  const [pan, setPan] = useState<{ x: number, y: number }>({ x: 0, y: 0 })
+  const [grabbing, setGrabbing] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const panningRef = useRef(false)
+  const panStartRef = useRef<{ mx: number, my: number, px: number, py: number }>({ mx: 0, my: 0, px: 0, py: 0 })
+  const panMovedRef = useRef(false)
+
   useEffect(() => {
     const w = worlds.find((x: any) => x.id === worldId)
     setMapScale(w?.map_scale || '')
@@ -122,6 +131,8 @@ export default function MapPage() {
   }
 
   function handleMapClick(e: React.MouseEvent<HTMLDivElement>) {
+    // Ignore the click that ends a pan-drag so it doesn't close the open pin.
+    if (panMovedRef.current) { panMovedRef.current = false; return }
     if (addingPin) {
       const rect = mapRef.current!.getBoundingClientRect()
       const x = ((e.clientX - rect.left) / rect.width) * 100
@@ -351,94 +362,132 @@ export default function MapPage() {
             {addingPin && (
               <div style={s.addingBanner}>Click anywhere on the map to place a pin</div>
             )}
-            <div ref={mapRef} style={{ ...s.mapContainer, cursor: addingPin ? 'crosshair' : draggingId ? 'grabbing' : 'default' }}
+
+            {/* Zoom controls */}
+            {mapImageUrl && (
+              <div style={s.zoomBar}>
+                <button style={s.zoomBtn} title="Zoom in"
+                  onClick={() => setZoom(z => Math.min(5, +(z + 0.5).toFixed(2)))}>+</button>
+                <div style={s.zoomLabel}>{Math.round(zoom * 100)}%</div>
+                <button style={s.zoomBtn} title="Zoom out"
+                  onClick={() => setZoom(z => { const nz = Math.max(1, +(z - 0.5).toFixed(2)); if (nz === 1) setPan({ x: 0, y: 0 }); return nz })}>−</button>
+                <button style={{ ...s.zoomBtn, fontSize: 12 }} title="Reset view"
+                  onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>⊙</button>
+              </div>
+            )}
+
+            <div ref={mapRef}
+              style={{ ...s.mapContainer, cursor: addingPin ? 'crosshair' : measureMode ? 'crosshair' : (draggingId || grabbing) ? 'grabbing' : 'grab' }}
               onClick={handleMapClick}
+              onMouseDown={e => {
+                if (e.button !== 0 || addingPin || measureMode || draggingId) return
+                panningRef.current = true
+                panMovedRef.current = false
+                panStartRef.current = { mx: e.clientX, my: e.clientY, px: pan.x, py: pan.y }
+                setGrabbing(true)
+              }}
               onMouseMove={e => {
-                if (!draggingId || !mapRef.current) return
-                dragHappenedRef.current = true
-                const rect = mapRef.current.getBoundingClientRect()
-                const x = Math.min(100, Math.max(0, ((e.clientX - rect.left - dragOffset.x) / rect.width) * 100))
-                const y = Math.min(100, Math.max(0, ((e.clientY - rect.top - dragOffset.y) / rect.height) * 100))
-                setLocations(prev => prev.map(l => l.id === draggingId ? { ...l, x_percent: x, y_percent: y } : l))
+                if (draggingId && wrapRef.current) {
+                  dragHappenedRef.current = true
+                  const rect = wrapRef.current.getBoundingClientRect()
+                  const x = Math.min(100, Math.max(0, ((e.clientX - rect.left - dragOffset.x) / rect.width) * 100))
+                  const y = Math.min(100, Math.max(0, ((e.clientY - rect.top - dragOffset.y) / rect.height) * 100))
+                  setLocations(prev => prev.map(l => l.id === draggingId ? { ...l, x_percent: x, y_percent: y } : l))
+                  return
+                }
+                if (panningRef.current) {
+                  const dx = e.clientX - panStartRef.current.mx
+                  const dy = e.clientY - panStartRef.current.my
+                  if (Math.abs(dx) > 3 || Math.abs(dy) > 3) panMovedRef.current = true
+                  setPan({ x: panStartRef.current.px + dx, y: panStartRef.current.py + dy })
+                }
               }}
               onMouseUp={async e => {
-                if (!draggingId) return
-                const rect = mapRef.current!.getBoundingClientRect()
-                const x = Math.min(100, Math.max(0, ((e.clientX - rect.left - dragOffset.x) / rect.width) * 100))
-                const y = Math.min(100, Math.max(0, ((e.clientY - rect.top - dragOffset.y) / rect.height) * 100))
-                await fetch('/api/dm/map', {
-                  method: 'PATCH', headers: authH,
-                  body: JSON.stringify({ locationId: draggingId, xPercent: x, yPercent: y })
-                })
-                setDraggingId(null)
+                if (draggingId && wrapRef.current) {
+                  const rect = wrapRef.current.getBoundingClientRect()
+                  const x = Math.min(100, Math.max(0, ((e.clientX - rect.left - dragOffset.x) / rect.width) * 100))
+                  const y = Math.min(100, Math.max(0, ((e.clientY - rect.top - dragOffset.y) / rect.height) * 100))
+                  await fetch('/api/dm/map', {
+                    method: 'PATCH', headers: authH,
+                    body: JSON.stringify({ locationId: draggingId, xPercent: x, yPercent: y })
+                  })
+                  setDraggingId(null)
+                  return
+                }
+                panningRef.current = false
+                setGrabbing(false)
               }}
-              onMouseLeave={() => setDraggingId(null)}>
-              {mapImageUrl
-                ? <img ref={imgRef} src={mapImageUrl} alt="World Map" style={s.mapImg} draggable={false} />
-                : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#5a4a30', fontStyle: 'italic' }}>No map image set. Add a map URL in the World tab.</div>
-              }
+              onMouseLeave={() => { setDraggingId(null); panningRef.current = false; setGrabbing(false) }}>
 
-              {/* Existing pins */}
-              {locations.map(loc => {
-                const revealCount = getRevealedPlayerCount(loc.id)
-                const isSelected = selectedPin?.id === loc.id
-                const isDragging = draggingId === loc.id
-                return (
-                  <div key={loc.id}
-                    style={{
-                      ...s.pin,
-                      left: `${loc.x_percent}%`,
-                      top: `${loc.y_percent}%`,
-                      ...(isSelected ? s.pinSelected : {}),
-                      ...(isDragging ? { opacity: 0.7, cursor: 'grabbing' } : { cursor: 'grab' })
-                    }}
-                    onClick={e => {
-                      if (dragHappenedRef.current) return
-                      e.stopPropagation()
-                      if (selectedPin?.id === loc.id) {
-                        setSelectedPin(null)
-                        setEditingPin(false)
-                      } else {
-                        setSelectedPin(loc)
-                        setEditingPin(false)
-                        setEditName(loc.name)
-                        setEditLore(loc.lore || '')
-                        setRevealMsg('')
-                        setNewPinPos(null)
-                      }
-                    }}
-                    onMouseDown={e => {
-                      if (addingPin) return
-                      e.stopPropagation()
-                      e.preventDefault()
-                      dragHappenedRef.current = false
-                      const rect = mapRef.current!.getBoundingClientRect()
-                      const pinX = (loc.x_percent / 100) * rect.width
-                      const pinY = (loc.y_percent / 100) * rect.height
-                      setDragOffset({
-                        x: e.clientX - rect.left - pinX,
-                        y: e.clientY - rect.top - pinY
-                      })
-                      setDraggingId(loc.id)
-                    }}>
-                    <div style={s.pinDot} />
-                    <div style={s.pinLabel}>
-                      {loc.name}
-                      {revealCount > 0 && <span style={s.revealBadge}>{revealCount}</span>}
+              {/* Pan/zoom transform layer — image + pins move/scale together */}
+              <div ref={wrapRef} style={{ position: 'absolute', inset: 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'center center', transition: panningRef.current ? 'none' : 'transform 0.08s ease-out' }}>
+                {mapImageUrl
+                  ? <img ref={imgRef} src={mapImageUrl} alt="World Map" style={s.mapImg} draggable={false} />
+                  : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#5a4a30', fontStyle: 'italic' }}>No map image set. Add a map URL in the World tab.</div>
+                }
+
+                {/* Existing pins */}
+                {locations.map(loc => {
+                  const revealCount = getRevealedPlayerCount(loc.id)
+                  const isSelected = selectedPin?.id === loc.id
+                  const isDragging = draggingId === loc.id
+                  return (
+                    <div key={loc.id}
+                      style={{
+                        ...s.pin,
+                        left: `${loc.x_percent}%`,
+                        top: `${loc.y_percent}%`,
+                        ...(isSelected ? s.pinSelected : {}),
+                        ...(isDragging ? { opacity: 0.7, cursor: 'grabbing' } : { cursor: 'grab' })
+                      }}
+                      onClick={e => {
+                        if (dragHappenedRef.current) return
+                        e.stopPropagation()
+                        if (selectedPin?.id === loc.id) {
+                          setSelectedPin(null)
+                          setEditingPin(false)
+                        } else {
+                          setSelectedPin(loc)
+                          setEditingPin(false)
+                          setEditName(loc.name)
+                          setEditLore(loc.lore || '')
+                          setRevealMsg('')
+                          setNewPinPos(null)
+                        }
+                      }}
+                      onMouseDown={e => {
+                        if (addingPin) return
+                        e.stopPropagation()
+                        e.preventDefault()
+                        dragHappenedRef.current = false
+                        const rect = wrapRef.current!.getBoundingClientRect()
+                        const pinX = (loc.x_percent / 100) * rect.width
+                        const pinY = (loc.y_percent / 100) * rect.height
+                        setDragOffset({
+                          x: e.clientX - rect.left - pinX,
+                          y: e.clientY - rect.top - pinY
+                        })
+                        setDraggingId(loc.id)
+                      }}>
+                      <div style={s.pinDot} />
+                      <div style={s.pinLabel}>
+                        {loc.name}
+                        {revealCount > 0 && <span style={s.revealBadge}>{revealCount}</span>}
+                      </div>
                     </div>
+                  )
+                })}
+
+                {/* New pin placement */}
+                {newPinPos && (
+                  <div style={{ ...s.pin, left: `${newPinPos.x}%`, top: `${newPinPos.y}%` }}>
+                    <div style={{ ...s.pinDot, background: '#5aaa5a' }} />
+                    <div style={{ ...s.pinLabel, color: '#5aaa5a' }}>New pin</div>
                   </div>
-                )
-              })}
+                )}
+              </div>
 
-              {/* New pin placement */}
-              {newPinPos && (
-                <div style={{ ...s.pin, left: `${newPinPos.x}%`, top: `${newPinPos.y}%` }}>
-                  <div style={{ ...s.pinDot, background: '#5aaa5a' }} />
-                  <div style={{ ...s.pinLabel, color: '#5aaa5a' }}>New pin</div>
-                </div>
-              )}
-
-              {/* Measure overlay */}
+              {/* Measure overlay — screen-space, sits above the pan/zoom layer */}
               {measureMode && (
                 <div
                   onClick={e => e.stopPropagation()}
@@ -460,7 +509,8 @@ export default function MapPage() {
                       const sc = Math.min(cont.clientWidth / img.naturalWidth, cont.clientHeight / img.naturalHeight)
                       dw = img.naturalWidth * sc
                     }
-                    const miles = milesAcross > 0 ? Math.round(px * (milesAcross / dw)) : null
+                    // dw is the unzoomed contain-fit width; multiply by zoom for on-screen pixels.
+                    const miles = milesAcross > 0 ? Math.round(px * (milesAcross / (dw * zoom))) : null
                     return (
                       <>
                         <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
@@ -718,6 +768,9 @@ const s: Record<string, React.CSSProperties> = {
   layout: { display: 'flex', flex: 1, overflow: 'hidden', height: 'calc(100vh - 60px)' },
   mapWrap: { flex: 1, position: 'relative', overflow: 'hidden' },
   addingBanner: { position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)', background: 'rgba(201,147,58,0.9)', color: '#0d0a07', padding: '6px 16px', borderRadius: 6, fontSize: 13, fontWeight: 600, zIndex: 10, pointerEvents: 'none' },
+  zoomBar: { position: 'absolute', top: 16, right: 16, zIndex: 50, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, background: 'rgba(13,10,7,0.92)', border: '1px solid rgba(201,147,58,0.3)', borderRadius: 8, padding: 6 },
+  zoomBtn: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', color: '#e8b86d', border: '1px solid rgba(201,147,58,0.35)', borderRadius: 6, fontSize: 18, lineHeight: 1, cursor: 'pointer', fontFamily: 'Georgia, serif' },
+  zoomLabel: { fontSize: 10, color: '#9a8a70', minWidth: 30, textAlign: 'center', letterSpacing: '0.05em' },
   mapContainer: { width: '100%', height: '100%', position: 'relative', overflow: 'hidden' },
   mapImg: { width: '100%', height: '100%', objectFit: 'contain', display: 'block', userSelect: 'none' },
   pin: { position: 'absolute', transform: 'translate(-50%, -100%)', cursor: 'pointer', zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center' },
