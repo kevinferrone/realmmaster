@@ -110,6 +110,7 @@ export default function DMPortal() {
   const [newPartyDesc, setNewPartyDesc] = useState('')
 
   const [selectedPlayer, setSelectedPlayer] = useState<any>(null)
+  const [selectedParty, setSelectedParty] = useState<any>(null)
   const [knowledge, setKnowledge] = useState<any[]>([])
   const [sessions, setSessions] = useState<any[]>([])
   const [newKnow, setNewKnow] = useState({ category: 'lore', title: '', content: '' })
@@ -227,11 +228,37 @@ export default function DMPortal() {
   }
 
   async function loadPlayerKnowledge(player: any) {
+    setSelectedParty(null)
     setSelectedPlayer(player)
     const r = await fetch(`/api/dm/knowledge?playerId=${player.id}`, { headers: authH })
     const d = await r.json()
     setKnowledge(d.knowledge || [])
     setSessions(d.sessions || [])
+  }
+
+  // View a whole party: merge every member's knowledge + sessions, tagged with who knows it.
+  async function loadPartyKnowledge(party: any) {
+    setSelectedPlayer(null)
+    setSelectedParty(party)
+    setKnowledgeTab('ledger')
+    const members = party.members || []
+    const results = await Promise.all(members.map((m: any) =>
+      fetch(`/api/dm/knowledge?playerId=${m.id}`, { headers: authH })
+        .then(r => r.json())
+        .then(d => ({ m, d }))
+        .catch(() => ({ m, d: { knowledge: [], sessions: [] } }))
+    ))
+    const merged: any[] = []
+    const sess: any[] = []
+    results.forEach(({ m, d }: any) => {
+      const who = m.character_name || m.name
+      ;(d.knowledge || []).forEach((k: any) => merged.push({ ...k, _who: who }))
+      ;(d.sessions || []).forEach((sx: any) => sess.push({ ...sx, _who: who }))
+    })
+    merged.sort((a, b) => new Date(b.granted_at).getTime() - new Date(a.granted_at).getTime())
+    sess.sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())
+    setKnowledge(merged)
+    setSessions(sess)
   }
 
   async function sendKbMessage() {
@@ -1001,7 +1028,7 @@ async function loadLogs() {
                     {grantMsg && <p style={{ fontSize: 13, color: grantMsg.startsWith('✓') ? '#5aaa5a' : '#c04040', marginTop: 8 }}>{grantMsg}</p>}
                   </div>
                   <div style={{ ...s.card, marginTop: 14 }}>
-                    <div style={s.cardTitle}>Select Character to View</div>
+                    <div style={s.cardTitle}>Select Character or Party to View</div>
                     {players.map(p => (
                       <div key={p.id} style={{ ...s.playerRow, cursor: 'pointer', ...(selectedPlayer?.id === p.id ? { border: '1px solid rgba(201,147,58,0.5)', background: '#231a0a' } : {}) }}
                         onClick={() => loadPlayerKnowledge(p)}>
@@ -1012,17 +1039,32 @@ async function loadLogs() {
                         </div>
                       </div>
                     ))}
+                    {parties.length > 0 && (
+                      <>
+                        <div style={{ fontSize: 11, color: '#7a6a50', textTransform: 'uppercase' as any, letterSpacing: '0.1em', margin: '14px 0 8px' }}>Parties</div>
+                        {parties.map(pt => (
+                          <div key={pt.id} style={{ ...s.playerRow, cursor: 'pointer', ...(selectedParty?.id === pt.id ? { border: '1px solid rgba(201,147,58,0.5)', background: '#231a0a' } : {}) }}
+                            onClick={() => loadPartyKnowledge(pt)}>
+                            <div style={s.playerAvatar}>🛡</div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 500 }}>{pt.name}</div>
+                              <div style={{ fontSize: 12, color: '#7a6a50', fontStyle: 'italic' }}>{(pt.members || []).length} members</div>
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
                   </div>
                 </div>
                 <div>
-                  {selectedPlayer ? (
+                  {(selectedPlayer || selectedParty) ? (
                     <>
+                      <div style={{ fontSize: 13, color: '#e8b86d', fontWeight: 600, marginBottom: 10 }}>
+                        {selectedParty ? `🛡 ${selectedParty.name} — combined party knowledge` : `📖 ${selectedPlayer.character_name || selectedPlayer.name}`}
+                      </div>
                       <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid rgba(201,147,58,0.2)', marginBottom: 14 }}>
                         <button style={{ ...s.subTab, ...(knowledgeTab === 'ledger' ? s.subTabActive : {}) }} onClick={() => setKnowledgeTab('ledger')}>
                           Knowledge Ledger ({knowledge.length})
-                        </button>
-                        <button style={{ ...s.subTab, ...(knowledgeTab === 'sessions' ? s.subTabActive : {}) }} onClick={() => setKnowledgeTab('sessions')}>
-                          Session History ({sessions.length})
                         </button>
                       </div>
                       {knowledgeTab === 'ledger' && (
@@ -1051,6 +1093,7 @@ async function loadLogs() {
                                         <span style={{ fontWeight: 600, fontSize: 14, marginLeft: 8 }}>{k.title}</span>
                                         {k.source === 'dm_granted' && <span style={{ fontSize: 10, color: '#c9933a', marginLeft: 8 }}>DM</span>}
                                         {k.source === 'auto_extracted' && <span style={{ fontSize: 10, color: '#5a8a5a', marginLeft: 8 }}>AUTO</span>}
+                                        {selectedParty && k._who && <span style={{ fontSize: 10, color: '#9a8a70', marginLeft: 8 }}>· {k._who}</span>}
                                       </div>
                                       <div style={{ display: 'flex', gap: 6 }}>
                                         <button style={s.btnSm} onClick={() => { setEditingId(k.id); setEditData({ title: k.title, content: k.content, category: k.category }) }}>Edit</button>
@@ -1075,7 +1118,7 @@ async function loadLogs() {
                               <div key={sess.id} style={{ ...s.card, marginBottom: 10 }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                                   <span style={{ fontFamily: 'Georgia, serif', fontSize: 12, color: '#e8b86d', letterSpacing: '0.1em', textTransform: 'uppercase' as any }}>
-                                    Session {sessions.length - i}
+                                    {selectedParty && sess._who ? sess._who : `Session ${sessions.length - i}`}
                                   </span>
                                   <span style={{ fontSize: 11, color: '#5a4a30', fontStyle: 'italic' }}>
                                     {new Date(sess.started_at).toLocaleDateString()} · {sess.message_count} messages
@@ -1093,7 +1136,7 @@ async function loadLogs() {
                     </>
                   ) : (
                     <div style={{ ...s.card, display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200 }}>
-                      <p style={{ color: '#5a4a30', fontStyle: 'italic', fontSize: 15 }}>← Select a character to view their ledger</p>
+                      <p style={{ color: '#5a4a30', fontStyle: 'italic', fontSize: 15 }}>← Select a character or party to view their ledger</p>
                     </div>
                   )}
                 </div>
