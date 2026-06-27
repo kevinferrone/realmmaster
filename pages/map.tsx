@@ -245,6 +245,20 @@ export default function MapPage() {
     setEditingPin(false)
   }
 
+  // Pin appearance (size + rotation). Update locally for instant preview, persist on release.
+  function previewPinStyle(scale: number, rotation: number) {
+    if (!selectedPin) return
+    setLocations(prev => prev.map(l => l.id === selectedPin.id ? { ...l, pin_scale: scale, pin_rotation: rotation } : l))
+    setSelectedPin((p: any) => p ? { ...p, pin_scale: scale, pin_rotation: rotation } : p)
+  }
+  async function savePinStyle(scale: number, rotation: number) {
+    if (!selectedPin) return
+    await fetch('/api/dm/map', {
+      method: 'PATCH', headers: authH,
+      body: JSON.stringify({ locationId: selectedPin.id, pinScale: scale, pinRotation: rotation })
+    })
+  }
+
   async function deletePin() {
     if (!selectedPin || !confirm('Delete this location?')) return
     await fetch('/api/dm/map', {
@@ -437,6 +451,7 @@ export default function MapPage() {
                         ...s.pin,
                         left: `${loc.x_percent}%`,
                         top: `${loc.y_percent}%`,
+                        transform: `translate(-50%, -100%) scale(${loc.pin_scale ?? 1}) rotate(${loc.pin_rotation ?? 0}deg)`,
                         ...(isSelected ? s.pinSelected : {}),
                         ...(isDragging ? { opacity: 0.7, cursor: 'grabbing' } : { cursor: 'grab' })
                       }}
@@ -676,6 +691,31 @@ export default function MapPage() {
                       }
                     </div>
 
+                    <div style={{ marginTop: 14, borderTop: '1px solid rgba(201,147,58,0.15)', paddingTop: 14 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                        <div style={{ ...s.panelTitle, marginBottom: 0 }}>🎚 Pin Appearance</div>
+                        <button style={s.btnSm} onClick={() => { previewPinStyle(1, 0); savePinStyle(1, 0) }}>Reset</button>
+                      </div>
+                      <label style={{ fontSize: 11, color: '#7a6a50', display: 'block', marginBottom: 4 }}>
+                        Size — {Math.round((selectedPin.pin_scale ?? 1) * 100)}%
+                      </label>
+                      <input type="range" min={0.5} max={3} step={0.1}
+                        value={selectedPin.pin_scale ?? 1}
+                        onChange={e => previewPinStyle(parseFloat(e.target.value), selectedPin.pin_rotation ?? 0)}
+                        onMouseUp={e => savePinStyle(parseFloat((e.target as HTMLInputElement).value), selectedPin.pin_rotation ?? 0)}
+                        onTouchEnd={e => savePinStyle(parseFloat((e.target as HTMLInputElement).value), selectedPin.pin_rotation ?? 0)}
+                        style={{ width: '100%', marginBottom: 14, accentColor: '#c9933a' }} />
+                      <label style={{ fontSize: 11, color: '#7a6a50', display: 'block', marginBottom: 4 }}>
+                        Rotation — {Math.round(selectedPin.pin_rotation ?? 0)}°
+                      </label>
+                      <input type="range" min={-180} max={180} step={5}
+                        value={selectedPin.pin_rotation ?? 0}
+                        onChange={e => previewPinStyle(selectedPin.pin_scale ?? 1, parseFloat(e.target.value))}
+                        onMouseUp={e => savePinStyle(selectedPin.pin_scale ?? 1, parseFloat((e.target as HTMLInputElement).value))}
+                        onTouchEnd={e => savePinStyle(selectedPin.pin_scale ?? 1, parseFloat((e.target as HTMLInputElement).value))}
+                        style={{ width: '100%', accentColor: '#c9933a' }} />
+                    </div>
+
                                         <div style={{ marginTop: 14, borderTop: '1px solid rgba(201,147,58,0.15)', paddingTop: 14 }}>
                       <div style={s.panelTitle}>🔓 Reveal Lore To</div>
                       <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
@@ -773,8 +813,7 @@ const s: Record<string, React.CSSProperties> = {
   zoomLabel: { fontSize: 10, color: '#9a8a70', minWidth: 30, textAlign: 'center', letterSpacing: '0.05em' },
   mapContainer: { width: '100%', height: '100%', position: 'relative', overflow: 'hidden' },
   mapImg: { width: '100%', height: '100%', objectFit: 'contain', display: 'block', userSelect: 'none' },
-  pin: { position: 'absolute', transform: 'translate(-50%, -100%)', cursor: 'pointer', zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center' },
-  pinSelected: { zIndex: 6 },
+   pin: { position: 'absolute', transform: 'translate(-50%, -100%)', transformOrigin: 'bottom center', cursor: 'pointer', zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center' },
   pinDot: { width: 12, height: 12, borderRadius: '50%', background: '#c9933a', border: '2px solid #f5d49a', boxShadow: '0 0 6px rgba(201,147,58,0.6)' },
   pinLabel: { background: 'rgba(13,10,7,0.85)', border: '1px solid rgba(201,147,58,0.4)', borderRadius: 4, padding: '2px 6px', fontSize: 11, color: '#e8b86d', whiteSpace: 'nowrap', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 },
   revealBadge: { background: '#5aaa5a', color: '#0d0a07', borderRadius: '50%', width: 14, height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700 },
