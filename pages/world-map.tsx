@@ -279,7 +279,7 @@ const s: Record<string, React.CSSProperties> = {
   sidebar: { width: 300, borderLeft: '1px solid rgba(201,147,58,0.2)', background: '#0d0a07', overflowY: 'auto', flexShrink: 0 },
   panel: { padding: '1.25rem' },
   panelTitle: { fontSize: 12, letterSpacing: '0.12em', color: '#e8b86d', marginBottom: 12, textTransform: 'uppercase' },
-  loreBox: { background: '#1a1206', border: '1px solid rgba(201,147,58,0.15)', borderRadius: 8, padding: '10px 12px', marginTop: 10 },
+  loreBox: { background: '#1a1206', border: '1px solid rgba(201,147,58,0.15)', borderRadius: 8, padding: '10px 12px', marginTop: 10, maxHeight: 280, overflowY: 'auto', overflowWrap: 'break-word' },
   lockedBox: { background: '#1a1206', border: '1px solid rgba(90,74,48,0.3)', borderRadius: 8, padding: '20px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center' },
   revealedBadge: { fontSize: 11, color: '#5aaa5a', background: 'rgba(58,122,58,0.1)', border: '1px solid rgba(58,122,58,0.3)', borderRadius: 4, padding: '3px 8px', display: 'inline-block' },
   btnSm: { background: 'transparent', color: '#c9933a', border: '1px solid rgba(201,147,58,0.35)', borderRadius: 5, padding: '4px 10px', fontFamily: 'Georgia, serif', fontSize: 11, cursor: 'pointer' },
