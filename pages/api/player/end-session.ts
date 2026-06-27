@@ -29,7 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const transcript = messages.map(m =>
-    `${m.role === 'user' ? player.character_name || 'Player' : 'DM'}: ${m.content}`
+    `${m.role === 'user' ? player.character_name || 'Player' : 'GM'}: ${m.content}`
   ).join('\n\n')
 
   const { data: existingKnowledge } = await db
