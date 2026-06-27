@@ -1051,6 +1051,7 @@ async function loadLogs() {
                                       </div>
                                     </div>
                                     <p style={{ fontSize: 13, color: '#b8a888', lineHeight: 1.6 }}>{k.content}</p>
+                                                                        <span style={{ fontSize: 11, color: '#5a4a30', fontStyle: 'italic' }}>{new Date(k.granted_at).toLocaleString()}</span>
                                   </div>
                                 )}
                               </div>
