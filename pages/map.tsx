@@ -294,13 +294,13 @@ export default function MapPage() {
           </a>
           <div style={{ display: 'flex', gap: 3 }}>
             {[
-              { href: '/', label: '🌍 Worlds' },
-              { href: '/?tab=players', label: '🧙 Players' },
-              { href: '/?tab=knowledge', label: '🧠 Knowledge' },
-              { href: '/?tab=renown', label: '⭐ Renown' },
-              { href: '/?tab=logs', label: '📋 Logs' },
+              { tab: 'worlds', label: '🌍 Worlds' },
+              { tab: 'players', label: '🧙 Players' },
+              { tab: 'knowledge', label: '🧠 Knowledge' },
+              { tab: 'renown', label: '⭐ Renown' },
+              { tab: 'logs', label: '📋 Logs' },
             ].map(t => (
-              <a key={t.href} href={t.href} style={{ textDecoration: 'none' }}>
+              <a key={t.tab} href={`/?tab=${t.tab}${worldId ? `&worldId=${worldId}` : ''}`} style={{ textDecoration: 'none' }}>
                 <button style={s.navTab}>{t.label}</button>
               </a>
             ))}
