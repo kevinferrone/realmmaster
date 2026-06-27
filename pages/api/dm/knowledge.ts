@@ -24,7 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       db.from('character_knowledge')
         .select('*')
         .eq('player_id', playerId)
-        .order('granted_at', { ascending: true }),
+        .order('granted_at', { ascending: false }),
       db.from('sessions')
         .select('id, started_at, ended_at, summary, message_count')
         .eq('player_id', playerId)
