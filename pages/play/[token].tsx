@@ -217,7 +217,7 @@ export default function PlayerPortal() {
           {tab === 'setup' && (
             <div>
               <h1 style={s.title}>Your Character</h1>
-              <p style={s.sub}>The AI DM answers only through the lens of your character's knowledge.</p>
+              <p style={s.sub}>The AI GM answers only through the lens of your character's knowledge.</p>
 
               <div style={s.grid2}>
                 <div>
@@ -274,7 +274,7 @@ export default function PlayerPortal() {
                     <div style={{ borderTop: '1px solid rgba(201,147,58,0.15)', paddingTop: 14 }}>
                       <div style={s.cardTitle}>Spend Renown Points</div>
                       <p style={{ fontSize: 12, color: '#7a6a50', fontStyle: 'italic', marginBottom: 10 }}>
-                        Spend points to gain renown levels and unlock benefits granted by your DM.
+                        Spend points to gain renown levels and unlock benefits granted by your GM.
                       </p>
                       <input style={s.input} type="number" value={spendPoints} onChange={e => setSpendPoints(e.target.value)} placeholder="Points to spend" />
                       <input style={s.input} value={spendReason} onChange={e => setSpendReason(e.target.value)} placeholder="What are you spending them on?" />
@@ -345,7 +345,7 @@ export default function PlayerPortal() {
                 <div style={s.chatHeader}>
                   <div style={s.chatAvatar}>🎲</div>
                   <div>
-                    <div style={{ fontSize: 14, color: '#e8b86d' }}>The Dungeon Master</div>
+                    <div style={{ fontSize: 14, color: '#e8b86d' }}>The Game Master</div>
                     <div style={{ fontSize: 12, color: '#7a6a50', fontStyle: 'italic' }}>
                       {chatLoading ? 'Consulting the ancient lore...' : sessionEnded ? 'Session concluded' : 'Ready'}
                     </div>
@@ -356,7 +356,7 @@ export default function PlayerPortal() {
                   {messages.map(m => (
                     <div key={m.id} style={{ ...s.msg, ...(m.role === 'user' ? s.msgUser : {}) }}>
                       <div style={{ ...s.avatar, ...(m.role === 'user' ? s.avatarUser : s.avatarDm) }}>
-                        {m.role === 'user' ? (charName?.slice(0, 2).toUpperCase() || 'ME') : 'DM'}
+                        {m.role === 'user' ? (charName?.slice(0, 2).toUpperCase() || 'ME') : 'GM'}
                       </div>
                       <div style={{ ...s.bubble, ...(m.role === 'user' ? s.bubbleUser : s.bubbleDm) }}>
                         {m.content.split('\n').map((line, i) => <span key={i}>{line}{i < m.content.split('\n').length - 1 ? <br /> : ''}</span>)}
@@ -365,7 +365,7 @@ export default function PlayerPortal() {
                   ))}
                   {chatLoading && (
                     <div style={s.msg}>
-                      <div style={{ ...s.avatar, ...s.avatarDm }}>DM</div>
+                      <div style={{ ...s.avatar, ...s.avatarDm }}>GM</div>
                       <div style={{ ...s.bubble, ...s.bubbleDm, opacity: 0.5 }}>▌</div>
                     </div>
                   )}
@@ -376,7 +376,7 @@ export default function PlayerPortal() {
                   <textarea style={{ ...s.chatInput, opacity: sessionEnded ? 0.5 : 1 }} value={input}
                     onChange={e => setInput(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
-                    placeholder={sessionEnded ? 'Start a new session to continue...' : 'Ask the DM a question as your character...'}
+                    placeholder={sessionEnded ? 'Start a new session to continue...' : 'Ask the GM a question as your character...'}
                     disabled={chatLoading || sessionEnded} />
                   <button style={{ ...s.sendBtn, opacity: chatLoading || sessionEnded ? 0.4 : 1 }} onClick={sendMessage} disabled={chatLoading || sessionEnded}>➤</button>
                 </div>
