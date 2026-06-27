@@ -11,7 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'GET') {
     const { data: worlds } = await db
       .from('worlds')
-      .select('id, name, description, canon_text, map_image_url, created_at, updated_at')
+      .select('id, name, description, canon_text, map_image_url, map_scale, map_description, created_at, updated_at')
       .eq('dm_id', user.id)
       .order('updated_at', { ascending: false })
     return res.json({ worlds: worlds || [] })
@@ -28,12 +28,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (req.method === 'PATCH') {
-    const { worldId, name, description, canonText, mapImageUrl } = req.body
+        const { worldId, name, description, canonText, mapImageUrl, mapScale, mapDescription } = req.body
     const updates: any = {}
     if (name !== undefined) updates.name = name
     if (description !== undefined) updates.description = description
     if (canonText !== undefined) updates.canon_text = canonText
     if (mapImageUrl !== undefined) updates.map_image_url = mapImageUrl
+    if (mapScale !== undefined) updates.map_scale = mapScale
+    if (mapDescription !== undefined) updates.map_description = mapDescription
     updates.updated_at = new Date().toISOString()
     await db.from('worlds').update(updates).eq('id', worldId).eq('dm_id', user.id)
     return res.json({ success: true })
