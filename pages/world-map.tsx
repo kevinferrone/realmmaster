@@ -131,6 +131,7 @@ export default function PlayerMap() {
                         ...s.pin,
                         left: `${loc.x_percent}%`,
                         top: `${loc.y_percent}%`,
+                        transform: `translate(-50%, -100%) scale(${loc.pin_scale ?? 1}) rotate(${loc.pin_rotation ?? 0}deg)`,
                         ...(isSelected ? s.pinSelected : {})
                       }}
                       onClick={e => {
@@ -270,7 +271,7 @@ const s: Record<string, React.CSSProperties> = {
   zoomLabel: { fontSize: 10, color: '#9a8a70', minWidth: 30, textAlign: 'center', letterSpacing: '0.05em' },
   mapContainer: { width: '100%', height: '100%', position: 'relative', overflow: 'hidden' },
   mapImg: { width: '100%', height: '100%', objectFit: 'contain', display: 'block', userSelect: 'none' },
-  pin: { position: 'absolute', transform: 'translate(-50%, -100%)', cursor: 'pointer', zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center' },
+   pin: { position: 'absolute', transform: 'translate(-50%, -100%)', transformOrigin: 'bottom center', cursor: 'pointer', zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center' },
   pinSelected: { zIndex: 6 },
   pinDot: { width: 12, height: 12, borderRadius: '50%', border: '2px solid' },
   pinLabel: { background: 'rgba(13,10,7,0.85)', border: '1px solid', borderRadius: 4, padding: '2px 6px', fontSize: 11, whiteSpace: 'nowrap', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 },
