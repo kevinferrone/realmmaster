@@ -9,7 +9,7 @@ const CANON_SECTIONS = [
   '## HISTORY & TIMELINE',
   '## MAGIC & MECHANICS',
   '## CULTURE & SOCIETY',
-  '## DM ONLY — SECRETS & MYSTERIES',
+  '## GM ONLY — SECRETS & MYSTERIES',
 ]
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
