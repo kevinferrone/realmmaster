@@ -147,12 +147,20 @@ export default function DMPortal() {
   useEffect(() => { if (session) loadWorlds() }, [session])
   useEffect(() => { if (activeWorldId) { loadPlayers(); loadLogs(); loadParties(); loadRenown() } }, [activeWorldId])
 
+  // Open the tab requested via ?tab= (e.g. when coming back from the Map page).
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get('tab')
+    if (t && ['worlds', 'players', 'knowledge', 'renown', 'logs'].includes(t)) setTab(t as any)
+  }, [])
+
   async function loadWorlds() {
     const r = await fetch('/api/dm/worlds', { headers: authH })
     const d = await r.json()
     setWorlds(d.worlds || [])
     if (d.worlds?.length && !activeWorldId) {
-      const w = d.worlds[0]
+      // Honor ?worldId= (e.g. returning from the Map of a specific world); else default to the first.
+      const requestedId = new URLSearchParams(window.location.search).get('worldId')
+      const w = (requestedId && d.worlds.find((x: any) => x.id === requestedId)) || d.worlds[0]
       setActiveWorldId(w.id); setWorldName(w.name); setWorldDesc(w.description || ''); setCanonText(w.canon_text || ''); setWorldMap(w.map_image_url || '')
     }
   }
