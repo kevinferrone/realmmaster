@@ -173,12 +173,6 @@ export default function PlayerMap() {
                         setSelectedPin(loc)
                       }}>
                       <div style={{
-                        ...s.pinDot,
-                        background: revealed ? '#c9933a' : '#5a4a30',
-                        borderColor: revealed ? '#f5d49a' : '#7a6a50',
-                        boxShadow: revealed ? '0 0 6px rgba(201,147,58,0.6)' : 'none'
-                      }} />
-                      <div style={{
                         ...s.pinLabel,
                         color: revealed ? '#e8b86d' : '#7a6a50',
                         borderColor: revealed ? 'rgba(201,147,58,0.4)' : 'rgba(120,100,80,0.3)'
