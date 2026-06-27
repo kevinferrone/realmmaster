@@ -21,6 +21,15 @@ export default function PlayerMap() {
   const [measurePts, setMeasurePts] = useState<{ x: number, y: number }[]>([])
   const [measureCur, setMeasureCur] = useState<{ x: number, y: number } | null>(null)
 
+  // Zoom + pan
+  const [zoom, setZoom] = useState(1)
+  const [pan, setPan] = useState<{ x: number, y: number }>({ x: 0, y: 0 })
+  const [grabbing, setGrabbing] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const panningRef = useRef(false)
+  const panStartRef = useRef<{ mx: number, my: number, px: number, py: number }>({ mx: 0, my: 0, px: 0, py: 0 })
+  const panMovedRef = useRef(false)
+
   useEffect(() => { if (token) loadData() }, [token])
 
   async function loadData() {
@@ -73,46 +82,82 @@ export default function PlayerMap() {
         <div style={s.layout}>
           {/* MAP */}
           <div style={s.mapWrap}>
-            <div ref={mapRef} style={s.mapContainer}>
-              {mapImageUrl
-                ? <img ref={imgRef} src={mapImageUrl} alt="World Map" style={s.mapImg} draggable={false} />
-                : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#5a4a30', fontStyle: 'italic' }}>No map available yet.</div>
-              }
 
-              {locations.map(loc => {
-                const revealed = isRevealed(loc.id)
-                const isSelected = selectedPin?.id === loc.id
-                return (
-                  <div key={loc.id}
-                    style={{
-                      ...s.pin,
-                      left: `${loc.x_percent}%`,
-                      top: `${loc.y_percent}%`,
-                      ...(isSelected ? s.pinSelected : {})
-                    }}
-                    onClick={e => {
-                      e.stopPropagation()
-                      setSelectedPin(loc)
-                    }}>
-                    <div style={{
-                      ...s.pinDot,
-                      background: revealed ? '#c9933a' : '#5a4a30',
-                      borderColor: revealed ? '#f5d49a' : '#7a6a50',
-                      boxShadow: revealed ? '0 0 6px rgba(201,147,58,0.6)' : 'none'
-                    }} />
-                    <div style={{
-                      ...s.pinLabel,
-                      color: revealed ? '#e8b86d' : '#7a6a50',
-                      borderColor: revealed ? 'rgba(201,147,58,0.4)' : 'rgba(120,100,80,0.3)'
-                    }}>
-                      {loc.name}
-                      {revealed && <span style={s.revealedDot}>●</span>}
+            {/* Zoom controls */}
+            {mapImageUrl && (
+              <div style={s.zoomBar}>
+                <button style={s.zoomBtn} title="Zoom in"
+                  onClick={() => setZoom(z => Math.min(5, +(z + 0.5).toFixed(2)))}>+</button>
+                <div style={s.zoomLabel}>{Math.round(zoom * 100)}%</div>
+                <button style={s.zoomBtn} title="Zoom out"
+                  onClick={() => setZoom(z => { const nz = Math.max(1, +(z - 0.5).toFixed(2)); if (nz === 1) setPan({ x: 0, y: 0 }); return nz })}>−</button>
+                <button style={{ ...s.zoomBtn, fontSize: 12 }} title="Reset view"
+                  onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>⊙</button>
+              </div>
+            )}
+
+            <div ref={mapRef}
+              style={{ ...s.mapContainer, cursor: measureMode ? 'crosshair' : grabbing ? 'grabbing' : 'grab' }}
+              onMouseDown={e => {
+                if (e.button !== 0 || measureMode) return
+                panningRef.current = true
+                panMovedRef.current = false
+                panStartRef.current = { mx: e.clientX, my: e.clientY, px: pan.x, py: pan.y }
+                setGrabbing(true)
+              }}
+              onMouseMove={e => {
+                if (!panningRef.current) return
+                const dx = e.clientX - panStartRef.current.mx
+                const dy = e.clientY - panStartRef.current.my
+                if (Math.abs(dx) > 3 || Math.abs(dy) > 3) panMovedRef.current = true
+                setPan({ x: panStartRef.current.px + dx, y: panStartRef.current.py + dy })
+              }}
+              onMouseUp={() => { panningRef.current = false; setGrabbing(false) }}
+              onMouseLeave={() => { panningRef.current = false; setGrabbing(false) }}>
+
+              {/* Pan/zoom transform layer — image + pins move/scale together */}
+              <div ref={wrapRef} style={{ position: 'absolute', inset: 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'center center', transition: panningRef.current ? 'none' : 'transform 0.08s ease-out' }}>
+                {mapImageUrl
+                  ? <img ref={imgRef} src={mapImageUrl} alt="World Map" style={s.mapImg} draggable={false} />
+                  : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#5a4a30', fontStyle: 'italic' }}>No map available yet.</div>
+                }
+
+                {locations.map(loc => {
+                  const revealed = isRevealed(loc.id)
+                  const isSelected = selectedPin?.id === loc.id
+                  return (
+                    <div key={loc.id}
+                      style={{
+                        ...s.pin,
+                        left: `${loc.x_percent}%`,
+                        top: `${loc.y_percent}%`,
+                        ...(isSelected ? s.pinSelected : {})
+                      }}
+                      onClick={e => {
+                        if (panMovedRef.current) { panMovedRef.current = false; return }
+                        e.stopPropagation()
+                        setSelectedPin(loc)
+                      }}>
+                      <div style={{
+                        ...s.pinDot,
+                        background: revealed ? '#c9933a' : '#5a4a30',
+                        borderColor: revealed ? '#f5d49a' : '#7a6a50',
+                        boxShadow: revealed ? '0 0 6px rgba(201,147,58,0.6)' : 'none'
+                      }} />
+                      <div style={{
+                        ...s.pinLabel,
+                        color: revealed ? '#e8b86d' : '#7a6a50',
+                        borderColor: revealed ? 'rgba(201,147,58,0.4)' : 'rgba(120,100,80,0.3)'
+                      }}>
+                        {loc.name}
+                        {revealed && <span style={s.revealedDot}>●</span>}
+                      </div>
                     </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
+              </div>
 
-              {/* Measure overlay */}
+              {/* Measure overlay — screen-space, sits above the pan/zoom layer */}
               {measureMode && (
                 <div
                   onClick={e => e.stopPropagation()}
@@ -135,7 +180,8 @@ export default function PlayerMap() {
                       const sc = Math.min(cont.clientWidth / img.naturalWidth, cont.clientHeight / img.naturalHeight)
                       dw = img.naturalWidth * sc
                     }
-                    const miles = Math.round(px * (milesAcross / dw))
+                    // dw is the unzoomed contain-fit width; multiply by zoom for on-screen pixels.
+                    const miles = Math.round(px * (milesAcross / (dw * zoom)))
                     return (
                       <>
                         <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
@@ -219,6 +265,9 @@ const s: Record<string, React.CSSProperties> = {
   logo: { fontSize: 20, fontWeight: 700, color: '#e8b86d' },
   layout: { display: 'flex', flex: 1, overflow: 'hidden', height: 'calc(100vh - 60px)' },
   mapWrap: { flex: 1, position: 'relative', overflow: 'hidden' },
+  zoomBar: { position: 'absolute', top: 16, right: 16, zIndex: 50, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, background: 'rgba(13,10,7,0.92)', border: '1px solid rgba(201,147,58,0.3)', borderRadius: 8, padding: 6 },
+  zoomBtn: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', color: '#e8b86d', border: '1px solid rgba(201,147,58,0.35)', borderRadius: 6, fontSize: 18, lineHeight: 1, cursor: 'pointer', fontFamily: 'Georgia, serif' },
+  zoomLabel: { fontSize: 10, color: '#9a8a70', minWidth: 30, textAlign: 'center', letterSpacing: '0.05em' },
   mapContainer: { width: '100%', height: '100%', position: 'relative', overflow: 'hidden' },
   mapImg: { width: '100%', height: '100%', objectFit: 'contain', display: 'block', userSelect: 'none' },
   pin: { position: 'absolute', transform: 'translate(-50%, -100%)', cursor: 'pointer', zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center' },
