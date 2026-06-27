@@ -338,7 +338,7 @@ export default function MapPage() {
   }
 
   if (loading) return <div style={s.center}>✦ Loading map...</div>
-  if (!session) return <div style={s.center}><p style={{ color: '#c04040' }}>Sign in to the DM portal to access the map.</p></div>
+  if (!session) return <div style={s.center}><p style={{ color: '#c04040' }}>Sign in to the GM portal to access the map.</p></div>
 
   return (
     <>
@@ -623,7 +623,7 @@ export default function MapPage() {
                     {locMessages.map((m, i) => (
                       <div key={i} style={{ display: 'flex', gap: 6, flexDirection: m.role === 'user' ? 'row-reverse' as any : 'row' as any, alignItems: 'flex-start' }}>
                         <div style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, background: m.role === 'user' ? 'rgba(201,147,58,0.15)' : 'rgba(224,96,154,0.15)', border: `1px solid ${m.role === 'user' ? 'rgba(201,147,58,0.3)' : 'rgba(224,96,154,0.4)'}`, color: m.role === 'user' ? '#e8b86d' : '#e0609a' }}>
-                          {m.role === 'user' ? 'DM' : 'PB'}
+                          {m.role === 'user' ? 'GM' : 'PB'}
                         </div>
                         <div style={{ maxWidth: '85%', padding: '7px 10px', borderRadius: 8, fontSize: 12, lineHeight: 1.6, background: m.role === 'user' ? 'rgba(201,147,58,0.09)' : '#1a1206', border: `1px solid ${m.role === 'user' ? 'rgba(201,147,58,0.2)' : 'rgba(224,96,154,0.15)'}`, color: '#e8dcc8', whiteSpace: 'pre-wrap' as any }}>
                           {m.content}
