@@ -386,7 +386,7 @@ export default function MapPage() {
             <button
               style={{ ...s.btnSm, ...(addingPin ? { background: 'rgba(201,147,58,0.2)', borderColor: '#c9933a', color: '#e8b86d' } : {}) }}
               onClick={() => { setAddingPin(!addingPin); setNewPinPos(null); setSelectedPin(null) }}>
-              {addingPin ? '✕ Cancel' : '+ Add Pin'}
+              {addingPin ? '✕ Cancel' : '+ Add Location'}
             </button>
                         <a href="/dm/chronicle" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
               <button style={s.btnSm}>📜 Chronicle</button>
@@ -416,7 +416,7 @@ export default function MapPage() {
           {/* MAP */}
           <div style={s.mapWrap}>
             {addingPin && (
-              <div style={s.addingBanner}>Click anywhere on the map to place a pin</div>
+              <div style={s.addingBanner}>Click anywhere on the map to place a location</div>
             )}
 
             {/* Zoom controls */}
@@ -529,7 +529,6 @@ export default function MapPage() {
                         setDragOffset(p ? { x: p.x - loc.x_percent, y: p.y - loc.y_percent } : { x: 0, y: 0 })
                         setDraggingId(loc.id)
                       }}>
-                      <div style={s.pinDot} />
                       <div style={s.pinLabel}>
                         {loc.name}
                         {revealCount > 0 && <span style={s.revealBadge}>{revealCount}</span>}
@@ -545,8 +544,7 @@ export default function MapPage() {
                   const top = rect ? `${rect.oy + (newPinPos.y / 100) * rect.dh}px` : `${newPinPos.y}%`
                   return (
                     <div style={{ ...s.pin, left, top }}>
-                      <div style={{ ...s.pinDot, background: '#5aaa5a' }} />
-                      <div style={{ ...s.pinLabel, color: '#5aaa5a' }}>New pin</div>
+                      <div style={{ ...s.pinLabel, color: '#5aaa5a' }}>New location</div>
                     </div>
                   )
                 })()}
@@ -819,12 +817,12 @@ export default function MapPage() {
                 <div style={s.panelTitle}>🗺 {selectedPin ? 'All Locations' : 'World Map'}</div>
                 {!selectedPin && (
                   <p style={{ fontSize: 13, color: '#7a6a50', fontStyle: 'italic', marginBottom: 10 }}>
-                    {addingPin ? 'Click on the map to place a pin.' : 'Click a pin or name below to view its lore. Click again or click the map to close.'}
+                    {addingPin ? 'Click on the map to place a location.' : 'Click a location or name below to view its lore. Click again or click the map to close.'}
                   </p>
                 )}
                 <div style={{ marginTop: selectedPin ? 0 : 4 }}>
                   <div style={{ fontSize: 11, color: '#7a6a50', textTransform: 'uppercase' as any, letterSpacing: '0.1em', marginBottom: 8 }}>All Locations ({locations.length})</div>
-                  {locations.length === 0 && <p style={{ fontSize: 13, color: '#5a4a30', fontStyle: 'italic' }}>No locations yet. Use "+ Add Pin" to place locations on the map.</p>}
+                  {locations.length === 0 && <p style={{ fontSize: 13, color: '#5a4a30', fontStyle: 'italic' }}>No locations yet. Use "+ Add Location" to place locations on the map.</p>}
                   {locations.map(loc => (
                     <div key={loc.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(201,147,58,0.08)', cursor: 'pointer', fontSize: 13 }}
                       onClick={() => {
