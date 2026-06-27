@@ -1,4 +1,4 @@
-// Chronicle — extraction logic shared by the DM endpoints.
+// Chronicle — extraction logic shared by the GM endpoints.
 // Mirrors RealmMaster's existing knowledge-builder pattern (Claude emits a fenced JSON
 // block, we parse it), extended with the v1 scope rule: party-default / explicit-split.
 
@@ -47,7 +47,7 @@ THE SCOPE RULE — the only attribution logic:
 - Do NOT infer private or secret knowledge. If it isn't said aloud, don't capture it.
 - Never invent anything not supported by the transcript or on-screen text.
 
-For anything uncertain — a guessed NPC/place name, an ambiguous partial-share, unclear presence — set "needs_review": true and explain briefly in "review_reason". The DM verifies these.
+For anything uncertain — a guessed NPC/place name, an ambiguous partial-share, unclear presence — set "needs_review": true and explain briefly in "review_reason". The GM verifies these.
 
 Output ONLY a fenced block, nothing before or after it:
 \`\`\`extraction
