@@ -1092,31 +1092,10 @@ async function loadLogs() {
             </div>
           )}
 
-          {tab === 'renown' && (
+                  {tab === 'renown' && (
             <div>
               <h1 style={s.pageTitle}>Renown</h1>
               <p style={s.pageSub}>Grant renown points to players or parties. Players spend them to gain renown levels.</p>
-                            <div style={{ ...s.card, marginBottom: 14 }}>
-                <div style={s.cardTitle}>🏆 Renown Levels</div>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                  <thead>
-                    <tr style={{ textAlign: 'left', color: '#7a6a50' }}>
-                      <th style={{ padding: '6px 8px' }}>Level</th>
-                      <th style={{ padding: '6px 8px' }}>Renown used to reach</th>
-                      <th style={{ padding: '6px 8px' }}>Description</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {RENOWN_LEVELS.map(l => (
-                      <tr key={l.level} style={{ borderTop: '1px solid rgba(201,147,58,0.12)' }}>
-                        <td style={{ padding: '6px 8px', color: '#e8b86d', fontWeight: 600, whiteSpace: 'nowrap' }}>{l.level}</td>
-                        <td style={{ padding: '6px 8px', color: '#c9933a' }}>{l.points}</td>
-                        <td style={{ padding: '6px 8px', color: '#b8a888' }}>{l.description}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
               <div style={s.grid2}>
                 <div style={s.card}>
                   <div style={s.cardTitle}>⭐ Grant Renown</div>
@@ -1183,9 +1162,30 @@ async function loadLogs() {
                   }
                 </div>
               </div>
+
+              <div style={{ ...s.card, marginTop: 14 }}>
+                <div style={s.cardTitle}>🏆 Renown Levels</div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ textAlign: 'left', color: '#7a6a50' }}>
+                      <th style={{ padding: '6px 8px' }}>Level</th>
+                      <th style={{ padding: '6px 8px' }}>Renown used to reach</th>
+                      <th style={{ padding: '6px 8px' }}>Description</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {RENOWN_LEVELS.map(l => (
+                      <tr key={l.level} style={{ borderTop: '1px solid rgba(201,147,58,0.12)' }}>
+                        <td style={{ padding: '6px 8px', color: '#e8b86d', fontWeight: 600, whiteSpace: 'nowrap' }}>{l.level}</td>
+                        <td style={{ padding: '6px 8px', color: '#c9933a' }}>{l.points}</td>
+                        <td style={{ padding: '6px 8px', color: '#b8a888' }}>{l.description}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
-
 
           
           {tab === 'logs' && (
