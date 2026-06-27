@@ -61,7 +61,7 @@ function AuthScreen() {
     <div style={s.center}>
       <div style={s.authCard}>
         <div style={s.logo}>⚔ Realm<span style={{ color: '#c04040' }}>Master</span></div>
-        <p style={s.authSub}>Dungeon Master Portal</p>
+        <p style={s.authSub}>Game Master Portal</p>
         <input style={s.input} placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} type="email" />
         <input style={s.input} placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} type="password" onKeyDown={e => e.key === 'Enter' && submit()} />
         {error && <p style={{ color: '#c04040', fontSize: 13, marginBottom: 8 }}>{error}</p>}
@@ -459,7 +459,7 @@ async function loadLogs() {
 
   return (
     <>
-      <Head><title>RealmMaster — DM Portal</title></Head>
+      <Head><title>RealmMaster — GM Portal</title></Head>
       <div style={s.root}>
         <nav style={s.nav}>
           <div style={s.logo}>⚔ Realm<span style={{ color: '#c04040' }}>Master</span></div>
@@ -531,7 +531,7 @@ async function loadLogs() {
                     <label style={s.label}>World Name</label>
                     <input style={s.input} value={worldName} onChange={e => setWorldName(e.target.value)} placeholder="e.g. Sorasula" />
                     <label style={s.label}>Description</label>
-                    <textarea style={{ ...s.input, height: 64, resize: 'vertical' as any }} value={worldDesc} onChange={e => setWorldDesc(e.target.value)} placeholder="Brief description for the AI DM..." />
+                    <textarea style={{ ...s.input, height: 64, resize: 'vertical' as any }} value={worldDesc} onChange={e => setWorldDesc(e.target.value)} placeholder="Brief description for the AI GM..." />
                     <label style={s.label}>World Map Image</label>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
                       <input style={{ ...s.input, margin: 0, flex: 1 }} value={worldMap} onChange={e => setWorldMap(e.target.value)} placeholder="Map image URL (auto-filled on upload)" />
@@ -590,7 +590,7 @@ async function loadLogs() {
                     <div style={s.cardTitle}>📜 Canon Sections</div>
                     {canonText ? (
                       <div>
-                        {['## GEOGRAPHY & LOCATIONS', '## FACTIONS & ORGANIZATIONS', '## NPCS & CHARACTERS', '## HISTORY & TIMELINE', '## MAGIC & MECHANICS', '## CULTURE & SOCIETY', '## DM ONLY — SECRETS & MYSTERIES'].map(section => (
+                        {['## GEOGRAPHY & LOCATIONS', '## FACTIONS & ORGANIZATIONS', '## NPCS & CHARACTERS', '## HISTORY & TIMELINE', '## MAGIC & MECHANICS', '## CULTURE & SOCIETY', '## GM ONLY — SECRETS & MYSTERIES'].map(section => (
                           <div key={section} style={{ display: 'flex', padding: '5px 0', borderBottom: '1px solid rgba(201,147,58,0.08)', fontSize: 12 }}>
                             <span style={{ color: canonText.includes(section) ? '#e8b86d' : '#5a4a30' }}>
                               {canonText.includes(section) ? '✓' : '○'} {section.replace('## ', '')}
@@ -663,7 +663,7 @@ async function loadLogs() {
                       {wbMessages.map((m, i) => (
                         <div key={i} style={{ display: 'flex', gap: 8, flexDirection: m.role === 'user' ? 'row-reverse' : 'row', alignItems: 'flex-start' }}>
                           <div style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, background: m.role === 'user' ? 'rgba(201,147,58,0.15)' : 'rgba(224,96,154,0.15)', border: `1px solid ${m.role === 'user' ? 'rgba(201,147,58,0.3)' : 'rgba(224,96,154,0.4)'}`, color: m.role === 'user' ? '#e8b86d' : '#e0609a' }}>
-                            {m.role === 'user' ? 'DM' : 'PB'}
+                            {m.role === 'user' ? 'GM' : 'PB'}
                           </div>
                           <div style={{ maxWidth: '80%', padding: '10px 14px', borderRadius: 10, fontSize: 13, lineHeight: 1.7, background: m.role === 'user' ? 'rgba(201,147,58,0.09)' : '#1a1206', border: `1px solid ${m.role === 'user' ? 'rgba(201,147,58,0.2)' : 'rgba(224,96,154,0.15)'}`, color: '#e8dcc8', whiteSpace: 'pre-wrap' as any }}>
                             {m.content}
@@ -741,7 +741,7 @@ async function loadLogs() {
               <div style={{ ...s.card, marginTop: 16 }}>
                 <div style={s.cardTitle}>📜 World Canon Text</div>
                 <p style={{ fontSize: 13, color: '#7a6a50', fontStyle: 'italic', marginBottom: 10 }}>
-                  Paste your world lore here. The AI DM reads all of this but only shares what each character would know.
+                  Paste your world lore here. The AI GM reads all of this but only shares what each character would know.
                 </p>
                 <textarea style={{ ...s.input, height: 320, resize: 'vertical' as any, fontFamily: 'monospace', fontSize: 13 }}
                   value={canonText} onChange={e => setCanonText(e.target.value)}
@@ -895,7 +895,7 @@ async function loadLogs() {
                       {kbMessages.map((m, i) => (
                         <div key={i} style={{ display: 'flex', gap: 8, flexDirection: m.role === 'user' ? 'row-reverse' as any : 'row' as any, alignItems: 'flex-start' }}>
                           <div style={{ width: 26, height: 26, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, background: m.role === 'user' ? 'rgba(201,147,58,0.15)' : 'rgba(224,96,154,0.15)', border: `1px solid ${m.role === 'user' ? 'rgba(201,147,58,0.3)' : 'rgba(224,96,154,0.4)'}`, color: m.role === 'user' ? '#e8b86d' : '#e0609a' }}>
-                            {m.role === 'user' ? 'DM' : 'PB'}
+                            {m.role === 'user' ? 'GM' : 'PB'}
                           </div>
                           <div style={{ maxWidth: '80%', padding: '8px 12px', borderRadius: 8, fontSize: 13, lineHeight: 1.6, background: m.role === 'user' ? 'rgba(201,147,58,0.09)' : '#1a1206', border: `1px solid ${m.role === 'user' ? 'rgba(201,147,58,0.2)' : 'rgba(224,96,154,0.15)'}`, color: '#e8dcc8', whiteSpace: 'pre-wrap' as any }}>
                             {m.content}
@@ -1091,7 +1091,7 @@ async function loadLogs() {
                                       <div>
                                         <span style={s.catBadge}>{k.category}</span>
                                         <span style={{ fontWeight: 600, fontSize: 14, marginLeft: 8 }}>{k.title}</span>
-                                        {k.source === 'dm_granted' && <span style={{ fontSize: 10, color: '#c9933a', marginLeft: 8 }}>DM</span>}
+                                        {k.source === 'dm_granted' && <span style={{ fontSize: 10, color: '#c9933a', marginLeft: 8 }}>GM</span>}
                                         {k.source === 'auto_extracted' && <span style={{ fontSize: 10, color: '#5a8a5a', marginLeft: 8 }}>AUTO</span>}
                                         {selectedParty && k._who && <span style={{ fontSize: 10, color: '#9a8a70', marginLeft: 8 }}>· {k._who}</span>}
                                       </div>
@@ -1262,7 +1262,7 @@ async function loadLogs() {
                         </span>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <span style={{ fontSize: 10, padding: '2px 6px', background: m.role === 'user' ? 'rgba(201,147,58,0.1)' : 'rgba(139,32,32,0.1)', border: `1px solid ${m.role === 'user' ? 'rgba(201,147,58,0.3)' : 'rgba(192,64,64,0.3)'}`, borderRadius: 4, color: m.role === 'user' ? '#c9933a' : '#c04040' }}>
-                            {m.role === 'user' ? 'Player' : 'DM'}
+                            {m.role === 'user' ? 'Player' : 'GM'}
                           </span>
                           <span style={{ fontSize: 11, color: '#5a4a30', fontStyle: 'italic' }}>{new Date(m.created_at).toLocaleString()}</span>
                         </div>
