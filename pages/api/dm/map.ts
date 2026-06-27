@@ -54,12 +54,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // PATCH: update location name/lore
   if (req.method === 'PATCH') {
-    const { locationId, name, lore, xPercent, yPercent } = req.body
+    const { locationId, name, lore, xPercent, yPercent, pinScale, pinRotation } = req.body
     const updates: any = { updated_at: new Date().toISOString() }
     if (name !== undefined) updates.name = name
     if (lore !== undefined) updates.lore = lore
     if (xPercent !== undefined) updates.x_percent = xPercent
     if (yPercent !== undefined) updates.y_percent = yPercent
+    if (pinScale !== undefined) updates.pin_scale = pinScale
+    if (pinRotation !== undefined) updates.pin_rotation = pinRotation
 
     await db.from('map_locations').update(updates)
       .eq('id', locationId).eq('dm_id', user.id)
