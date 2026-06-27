@@ -16,6 +16,10 @@ export default function PlayerMap() {
   const [reveals, setReveals] = useState<any[]>([])
   const [selectedPin, setSelectedPin] = useState<any>(null)
   const mapRef = useRef<HTMLDivElement>(null)
+  const imgRef = useRef<HTMLImageElement>(null)
+  const [measureMode, setMeasureMode] = useState(false)
+  const [measurePts, setMeasurePts] = useState<{ x: number, y: number }[]>([])
+  const [measureCur, setMeasureCur] = useState<{ x: number, y: number } | null>(null)
 
   useEffect(() => { if (token) loadData() }, [token])
 
@@ -55,9 +59,15 @@ export default function PlayerMap() {
         <nav style={s.nav}>
           <div style={s.logo}>⚔ Realm<span style={{ color: '#c04040' }}>Master</span></div>
           <div style={{ fontSize: 13, color: '#c9933a' }}>{world?.name} — World Map</div>
-          <a href={`/play/${token}`} style={{ textDecoration: 'none' }}>
-            <button style={s.btnSm}>← Back to Chat</button>
-          </a>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <button style={{ ...s.btnSm, ...(measureMode ? { background: 'rgba(201,147,58,0.2)', borderColor: '#c9933a', color: '#e8b86d' } : {}) }}
+              onClick={() => { setMeasureMode(m => !m); setSelectedPin(null); setMeasurePts([]); setMeasureCur(null) }}>
+              {measureMode ? '✕ Stop Measuring' : '📏 Measure'}
+            </button>
+            <a href={`/play/${token}`} style={{ textDecoration: 'none' }}>
+              <button style={s.btnSm}>← Back to Chat</button>
+            </a>
+          </div>
         </nav>
 
         <div style={s.layout}>
@@ -65,7 +75,7 @@ export default function PlayerMap() {
           <div style={s.mapWrap}>
             <div ref={mapRef} style={s.mapContainer}>
               {mapImageUrl
-                ? <img src={mapImageUrl} alt="World Map" style={s.mapImg} draggable={false} />
+                ? <img ref={imgRef} src={mapImageUrl} alt="World Map" style={s.mapImg} draggable={false} />
                 : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#5a4a30', fontStyle: 'italic' }}>No map available yet.</div>
               }
 
@@ -101,6 +111,45 @@ export default function PlayerMap() {
                   </div>
                 )
               })}
+
+              {/* Measure overlay */}
+              {measureMode && (
+                <div
+                  onClick={e => e.stopPropagation()}
+                  onMouseDown={e => { if (e.button !== 0) return; e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); const p = { x: e.clientX - r.left, y: e.clientY - r.top }; setMeasurePts([p]); setMeasureCur(p) }}
+                  onMouseMove={e => { if (!measurePts.length) return; const r = e.currentTarget.getBoundingClientRect(); setMeasureCur({ x: e.clientX - r.left, y: e.clientY - r.top }) }}
+                  onMouseUp={e => { if (e.button !== 0) return; e.stopPropagation(); setMeasurePts([]); setMeasureCur(null) }}
+                  onMouseLeave={() => { setMeasurePts([]); setMeasureCur(null) }}
+                  onContextMenu={e => { e.preventDefault(); if (measurePts.length && measureCur) setMeasurePts(p => [...p, measureCur]) }}
+                  style={{ position: 'absolute', inset: 0, zIndex: 100, cursor: 'crosshair' }}>
+                  {measurePts.length > 0 && measureCur && (() => {
+                    const pts = [...measurePts, measureCur]
+                    let px = 0
+                    for (let i = 1; i < pts.length; i++) px += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y)
+                    const ms = parseFloat(world?.map_scale)
+                    const milesAcross = ms > 0 ? ms : 100
+                    const cont = mapRef.current
+                    const img = imgRef.current
+                    let dw = cont ? cont.clientWidth : 1
+                    if (cont && img && img.naturalWidth) {
+                      const sc = Math.min(cont.clientWidth / img.naturalWidth, cont.clientHeight / img.naturalHeight)
+                      dw = img.naturalWidth * sc
+                    }
+                    const miles = Math.round(px * (milesAcross / dw))
+                    return (
+                      <>
+                        <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+                          <polyline points={pts.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#e8b86d" strokeWidth={2} />
+                          {pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={3} fill="#c04040" />)}
+                        </svg>
+                        <div style={{ position: 'absolute', left: measureCur.x + 10, top: measureCur.y - 28, background: '#1a1208', color: '#e8b86d', border: '1px solid #c9933a', borderRadius: 4, padding: '2px 8px', fontSize: 13, fontWeight: 600, pointerEvents: 'none', whiteSpace: 'nowrap' }}>
+                          {miles} mi
+                        </div>
+                      </>
+                    )
+                  })()}
+                </div>
+              )}
             </div>
           </div>
 
