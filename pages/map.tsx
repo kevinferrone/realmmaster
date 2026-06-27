@@ -57,6 +57,7 @@ export default function MapPage() {
   const [locExists, setLocExists] = useState(false)
 
   const mapRef = useRef<HTMLDivElement>(null)
+  const imgRef = useRef<HTMLImageElement>(null)
   const dragHappenedRef = useRef(false)
   const isDM = !!session
 
@@ -66,33 +67,21 @@ export default function MapPage() {
   useEffect(() => { if (session) loadWorlds() }, [session])
   useEffect(() => { if (worldId) { loadMap(); if (isDM) { loadPlayers(); loadParties() } } }, [worldId])
   
-  const [mapScale, setMapScale] = useState('')
-  const [mapDescription, setMapDescription] = useState('')
-  const [analyzingMap, setAnalyzingMap] = useState(false)
+  const [mapScale, setMapScale] = useState('')          // miles across the full map width
+  const [measureMode, setMeasureMode] = useState(false)
+  const [measurePts, setMeasurePts] = useState<{ x: number, y: number }[]>([])
+  const [measureCur, setMeasureCur] = useState<{ x: number, y: number } | null>(null)
   const [mapGuideMsg, setMapGuideMsg] = useState('')
 
   useEffect(() => {
     const w = worlds.find((x: any) => x.id === worldId)
     setMapScale(w?.map_scale || '')
-    setMapDescription(w?.map_description || '')
   }, [worldId, worlds])
 
-  async function analyzeMap() {
+  async function saveScale() {
     if (!worldId) return
-    setAnalyzingMap(true); setMapGuideMsg('')
-    try {
-      const r = await fetch('/api/dm/analyze-map', { method: 'POST', headers: authH, body: JSON.stringify({ worldId, mapScale }) })
-      const d = await r.json()
-      if (!r.ok) setMapGuideMsg('Error: ' + (d.error || 'failed'))
-      else { setMapDescription(d.mapDescription || ''); setMapGuideMsg('✓ Map analyzed — review the guide below, then Save.') }
-    } catch (e: any) { setMapGuideMsg('Error: ' + e.message) }
-    setAnalyzingMap(false)
-  }
-
-  async function saveMapGuide() {
-    if (!worldId) return
-    const r = await fetch('/api/dm/worlds', { method: 'PATCH', headers: authH, body: JSON.stringify({ worldId, mapScale, mapDescription }) })
-    setMapGuideMsg(r.ok ? '✓ Saved.' : 'Save failed.')
+    const r = await fetch('/api/dm/worlds', { method: 'PATCH', headers: authH, body: JSON.stringify({ worldId, mapScale }) })
+    setMapGuideMsg(r.ok ? '✓ Scale saved.' : 'Save failed.')
   }
 
   async function loadWorlds() {
@@ -343,16 +332,16 @@ export default function MapPage() {
         </nav>
         
         {isDM && mapImageUrl && (
-          <div style={{ ...s.card, margin: '12px 16px' }}>
-            <div style={s.panelTitle}>🧭 Map Analysis</div>
-            <label style={{ fontSize: 11, color: '#7a6a50' }}>Map scale — e.g. "≈50 miles per inch" or "the continent is ~800 miles across"</label>
-            <input style={s.select} value={mapScale} onChange={e => setMapScale(e.target.value)} placeholder="Describe the map's scale…" />
-            <div style={{ display: 'flex', gap: 8, margin: '8px 0' }}>
-              <button style={s.btnSm} onClick={analyzeMap} disabled={analyzingMap}>{analyzingMap ? 'Reading the map…' : '🔍 Analyze Map'}</button>
-              <button style={s.btnSm} onClick={saveMapGuide} disabled={analyzingMap}>💾 Save Guide</button>
-            </div>
-            <textarea style={{ ...s.select, height: 180, fontFamily: 'inherit' }} value={mapDescription} onChange={e => setMapDescription(e.target.value)} placeholder="Click Analyze Map — the AI reads your map image and writes a guide of locations, positions, and roads here. Review/edit it, then Save." />
-            {mapGuideMsg && <p style={{ fontSize: 12, color: mapGuideMsg.startsWith('✓') ? '#5aaa5a' : '#c04040', margin: '4px 0 0' }}>{mapGuideMsg}</p>}
+          <div style={{ margin: '12px 16px', padding: '10px 14px', background: '#1a1206', border: '1px solid rgba(201,147,58,0.2)', borderRadius: 8, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button style={{ ...s.btnSm, ...(measureMode ? { background: 'rgba(201,147,58,0.2)', borderColor: '#c9933a', color: '#e8b86d' } : {}) }}
+              onClick={() => { setMeasureMode(m => !m); setAddingPin(false); setSelectedPin(null); setMeasurePts([]); setMeasureCur(null) }}>
+              {measureMode ? '✕ Stop Measuring' : '📏 Measure'}
+            </button>
+            <label style={{ fontSize: 11, color: '#7a6a50' }}>Miles across full map width:</label>
+            <input style={{ ...s.select, width: 90, margin: 0 }} value={mapScale} onChange={e => setMapScale(e.target.value)} placeholder="e.g. 800" />
+            <button style={s.btnSm} onClick={saveScale}>💾 Save</button>
+            {measureMode && <span style={{ fontSize: 12, color: '#7a6a50' }}>Click-drag on the map. Right-click adds a bend. Release to clear.</span>}
+            {mapGuideMsg && <span style={{ fontSize: 12, color: mapGuideMsg.startsWith('✓') ? '#5aaa5a' : '#c04040' }}>{mapGuideMsg}</span>}
           </div>
         )}
 
@@ -385,7 +374,7 @@ export default function MapPage() {
               }}
               onMouseLeave={() => setDraggingId(null)}>
               {mapImageUrl
-                ? <img src={mapImageUrl} alt="World Map" style={s.mapImg} draggable={false} />
+                ? <img ref={imgRef} src={mapImageUrl} alt="World Map" style={s.mapImg} draggable={false} />
                 : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#5a4a30', fontStyle: 'italic' }}>No map image set. Add a map URL in the World tab.</div>
               }
 
@@ -446,6 +435,44 @@ export default function MapPage() {
                 <div style={{ ...s.pin, left: `${newPinPos.x}%`, top: `${newPinPos.y}%` }}>
                   <div style={{ ...s.pinDot, background: '#5aaa5a' }} />
                   <div style={{ ...s.pinLabel, color: '#5aaa5a' }}>New pin</div>
+                </div>
+              )}
+
+              {/* Measure overlay */}
+              {measureMode && (
+                <div
+                  onClick={e => e.stopPropagation()}
+                  onMouseDown={e => { if (e.button !== 0) return; e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); const p = { x: e.clientX - r.left, y: e.clientY - r.top }; setMeasurePts([p]); setMeasureCur(p) }}
+                  onMouseMove={e => { if (!measurePts.length) return; const r = e.currentTarget.getBoundingClientRect(); setMeasureCur({ x: e.clientX - r.left, y: e.clientY - r.top }) }}
+                  onMouseUp={e => { if (e.button !== 0) return; e.stopPropagation(); setMeasurePts([]); setMeasureCur(null) }}
+                  onMouseLeave={() => { setMeasurePts([]); setMeasureCur(null) }}
+                  onContextMenu={e => { e.preventDefault(); if (measurePts.length && measureCur) setMeasurePts(p => [...p, measureCur]) }}
+                  style={{ position: 'absolute', inset: 0, zIndex: 100, cursor: 'crosshair' }}>
+                  {measurePts.length > 0 && measureCur && (() => {
+                    const pts = [...measurePts, measureCur]
+                    let px = 0
+                    for (let i = 1; i < pts.length; i++) px += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y)
+                    const milesAcross = parseFloat(mapScale)
+                    const cont = mapRef.current
+                    const img = imgRef.current
+                    let dw = cont ? cont.clientWidth : 1
+                    if (cont && img && img.naturalWidth) {
+                      const sc = Math.min(cont.clientWidth / img.naturalWidth, cont.clientHeight / img.naturalHeight)
+                      dw = img.naturalWidth * sc
+                    }
+                    const miles = milesAcross > 0 ? Math.round(px * (milesAcross / dw)) : null
+                    return (
+                      <>
+                        <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+                          <polyline points={pts.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke="#e8b86d" strokeWidth={2} />
+                          {pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={3} fill="#c04040" />)}
+                        </svg>
+                        <div style={{ position: 'absolute', left: measureCur.x + 10, top: measureCur.y - 28, background: '#1a1208', color: '#e8b86d', border: '1px solid #c9933a', borderRadius: 4, padding: '2px 8px', fontSize: 13, fontWeight: 600, pointerEvents: 'none', whiteSpace: 'nowrap' }}>
+                          {miles !== null ? `${miles} mi` : 'set scale first'}
+                        </div>
+                      </>
+                    )
+                  })()}
                 </div>
               )}
             </div>
