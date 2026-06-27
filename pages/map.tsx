@@ -82,6 +82,49 @@ export default function MapPage() {
   const panStartRef = useRef<{ mx: number, my: number, px: number, py: number }>({ mx: 0, my: 0, px: 0, py: 0 })
   const panMovedRef = useRef(false)
 
+  // Pins are anchored to the rendered image rectangle (not the container), so they never
+  // move relative to the map when the container resizes (sidebar/scrollbar/layout changes).
+  const [contSize, setContSize] = useState({ w: 0, h: 0 })
+  const [natSize, setNatSize] = useState({ w: 0, h: 0 })
+
+  useEffect(() => {
+    const el = mapRef.current
+    if (!el) return
+    const update = () => setContSize({ w: el.clientWidth, h: el.clientHeight })
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [mapImageUrl])
+
+  useEffect(() => {
+    const img = imgRef.current
+    if (img && img.complete && img.naturalWidth) setNatSize({ w: img.naturalWidth, h: img.naturalHeight })
+  }, [mapImageUrl])
+
+  // The displayed image rect within the container, given objectFit: contain.
+  function imgRect() {
+    const { w: cw, h: ch } = contSize
+    const { w: nw, h: nh } = natSize
+    if (!cw || !ch || !nw || !nh) return null
+    const scale = Math.min(cw / nw, ch / nh)
+    const dw = nw * scale, dh = nh * scale
+    return { dw, dh, ox: (cw - dw) / 2, oy: (ch - dh) / 2 }
+  }
+
+  // Convert a mouse event into a percent position relative to the image (accounts for zoom/pan).
+  function eventToImagePercent(e: { clientX: number, clientY: number }) {
+    const wrap = wrapRef.current
+    const rect = imgRect()
+    if (!wrap || !rect) return null
+    const wr = wrap.getBoundingClientRect()
+    const cx = ((e.clientX - wr.left) / wr.width) * contSize.w
+    const cy = ((e.clientY - wr.top) / wr.height) * contSize.h
+    const x = Math.min(100, Math.max(0, ((cx - rect.ox) / rect.dw) * 100))
+    const y = Math.min(100, Math.max(0, ((cy - rect.oy) / rect.dh) * 100))
+    return { x, y }
+  }
+
   useEffect(() => {
     const w = worlds.find((x: any) => x.id === worldId)
     setMapScale(w?.map_scale || '')
@@ -134,10 +177,9 @@ export default function MapPage() {
     // Ignore the click that ends a pan-drag so it doesn't close the open pin.
     if (panMovedRef.current) { panMovedRef.current = false; return }
     if (addingPin) {
-      const rect = mapRef.current!.getBoundingClientRect()
-      const x = ((e.clientX - rect.left) / rect.width) * 100
-      const y = ((e.clientY - rect.top) / rect.height) * 100
-      setNewPinPos({ x, y })
+      const p = eventToImagePercent(e)
+      if (!p) return
+      setNewPinPos({ x: p.x, y: p.y })
       setNewPinName('')
       setNewPinLore('')
       setLocMessages([])
@@ -401,11 +443,12 @@ export default function MapPage() {
                 setGrabbing(true)
               }}
               onMouseMove={e => {
-                if (draggingId && wrapRef.current) {
+                if (draggingId) {
+                  const p = eventToImagePercent(e)
+                  if (!p) return
                   dragHappenedRef.current = true
-                  const rect = wrapRef.current.getBoundingClientRect()
-                  const x = Math.min(100, Math.max(0, ((e.clientX - rect.left - dragOffset.x) / rect.width) * 100))
-                  const y = Math.min(100, Math.max(0, ((e.clientY - rect.top - dragOffset.y) / rect.height) * 100))
+                  const x = Math.min(100, Math.max(0, p.x - dragOffset.x))
+                  const y = Math.min(100, Math.max(0, p.y - dragOffset.y))
                   setLocations(prev => prev.map(l => l.id === draggingId ? { ...l, x_percent: x, y_percent: y } : l))
                   return
                 }
@@ -417,14 +460,16 @@ export default function MapPage() {
                 }
               }}
               onMouseUp={async e => {
-                if (draggingId && wrapRef.current) {
-                  const rect = wrapRef.current.getBoundingClientRect()
-                  const x = Math.min(100, Math.max(0, ((e.clientX - rect.left - dragOffset.x) / rect.width) * 100))
-                  const y = Math.min(100, Math.max(0, ((e.clientY - rect.top - dragOffset.y) / rect.height) * 100))
-                  await fetch('/api/dm/map', {
-                    method: 'PATCH', headers: authH,
-                    body: JSON.stringify({ locationId: draggingId, xPercent: x, yPercent: y })
-                  })
+                if (draggingId) {
+                  const p = eventToImagePercent(e)
+                  const x = p ? Math.min(100, Math.max(0, p.x - dragOffset.x)) : undefined
+                  const y = p ? Math.min(100, Math.max(0, p.y - dragOffset.y)) : undefined
+                  if (x !== undefined && y !== undefined) {
+                    await fetch('/api/dm/map', {
+                      method: 'PATCH', headers: authH,
+                      body: JSON.stringify({ locationId: draggingId, xPercent: x, yPercent: y })
+                    })
+                  }
                   setDraggingId(null)
                   return
                 }
@@ -436,7 +481,8 @@ export default function MapPage() {
               {/* Pan/zoom transform layer — image + pins move/scale together */}
               <div ref={wrapRef} style={{ position: 'absolute', inset: 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'center center', transition: panningRef.current ? 'none' : 'transform 0.08s ease-out' }}>
                 {mapImageUrl
-                  ? <img ref={imgRef} src={mapImageUrl} alt="World Map" style={s.mapImg} draggable={false} />
+                  ? <img ref={imgRef} src={mapImageUrl} alt="World Map" style={s.mapImg} draggable={false}
+                      onLoad={e => setNatSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })} />
                   : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#5a4a30', fontStyle: 'italic' }}>No map image set. Add a map URL in the World tab.</div>
                 }
 
@@ -445,12 +491,15 @@ export default function MapPage() {
                   const revealCount = getRevealedPlayerCount(loc.id)
                   const isSelected = selectedPin?.id === loc.id
                   const isDragging = draggingId === loc.id
+                  const rect = imgRect()
+                  const left = rect ? `${rect.ox + (loc.x_percent / 100) * rect.dw}px` : `${loc.x_percent}%`
+                  const top = rect ? `${rect.oy + (loc.y_percent / 100) * rect.dh}px` : `${loc.y_percent}%`
                   return (
                     <div key={loc.id}
                       style={{
                         ...s.pin,
-                        left: `${loc.x_percent}%`,
-                        top: `${loc.y_percent}%`,
+                        left,
+                        top,
                         transform: `translate(-50%, -100%) scale(${loc.pin_scale ?? 1}) rotate(${loc.pin_rotation ?? 0}deg)`,
                         ...(isSelected ? s.pinSelected : {}),
                         ...(isDragging ? { opacity: 0.7, cursor: 'grabbing' } : { cursor: 'grab' })
@@ -475,13 +524,9 @@ export default function MapPage() {
                         e.stopPropagation()
                         e.preventDefault()
                         dragHappenedRef.current = false
-                        const rect = wrapRef.current!.getBoundingClientRect()
-                        const pinX = (loc.x_percent / 100) * rect.width
-                        const pinY = (loc.y_percent / 100) * rect.height
-                        setDragOffset({
-                          x: e.clientX - rect.left - pinX,
-                          y: e.clientY - rect.top - pinY
-                        })
+                        // Offset (in image-percent) between the cursor and the pin, so it doesn't jump.
+                        const p = eventToImagePercent(e)
+                        setDragOffset(p ? { x: p.x - loc.x_percent, y: p.y - loc.y_percent } : { x: 0, y: 0 })
                         setDraggingId(loc.id)
                       }}>
                       <div style={s.pinDot} />
@@ -494,12 +539,17 @@ export default function MapPage() {
                 })}
 
                 {/* New pin placement */}
-                {newPinPos && (
-                  <div style={{ ...s.pin, left: `${newPinPos.x}%`, top: `${newPinPos.y}%` }}>
-                    <div style={{ ...s.pinDot, background: '#5aaa5a' }} />
-                    <div style={{ ...s.pinLabel, color: '#5aaa5a' }}>New pin</div>
-                  </div>
-                )}
+                {newPinPos && (() => {
+                  const rect = imgRect()
+                  const left = rect ? `${rect.ox + (newPinPos.x / 100) * rect.dw}px` : `${newPinPos.x}%`
+                  const top = rect ? `${rect.oy + (newPinPos.y / 100) * rect.dh}px` : `${newPinPos.y}%`
+                  return (
+                    <div style={{ ...s.pin, left, top }}>
+                      <div style={{ ...s.pinDot, background: '#5aaa5a' }} />
+                      <div style={{ ...s.pinLabel, color: '#5aaa5a' }}>New pin</div>
+                    </div>
+                  )
+                })()}
               </div>
 
               {/* Measure overlay — screen-space, sits above the pan/zoom layer */}
@@ -813,7 +863,8 @@ const s: Record<string, React.CSSProperties> = {
   zoomLabel: { fontSize: 10, color: '#9a8a70', minWidth: 30, textAlign: 'center', letterSpacing: '0.05em' },
   mapContainer: { width: '100%', height: '100%', position: 'relative', overflow: 'hidden' },
   mapImg: { width: '100%', height: '100%', objectFit: 'contain', display: 'block', userSelect: 'none' },
-   pin: { position: 'absolute', transform: 'translate(-50%, -100%)', transformOrigin: 'bottom center', cursor: 'pointer', zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center' },
+  pin: { position: 'absolute', transform: 'translate(-50%, -100%)', transformOrigin: 'bottom center', cursor: 'pointer', zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center' },
+  pinSelected: { zIndex: 6 },
   pinDot: { width: 12, height: 12, borderRadius: '50%', background: '#c9933a', border: '2px solid #f5d49a', boxShadow: '0 0 6px rgba(201,147,58,0.6)' },
   pinLabel: { background: 'rgba(13,10,7,0.85)', border: '1px solid rgba(201,147,58,0.4)', borderRadius: 4, padding: '2px 6px', fontSize: 11, color: '#e8b86d', whiteSpace: 'nowrap', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 },
   revealBadge: { background: '#5aaa5a', color: '#0d0a07', borderRadius: '50%', width: 14, height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700 },
