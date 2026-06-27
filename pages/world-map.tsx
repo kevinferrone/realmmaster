@@ -30,6 +30,35 @@ export default function PlayerMap() {
   const panStartRef = useRef<{ mx: number, my: number, px: number, py: number }>({ mx: 0, my: 0, px: 0, py: 0 })
   const panMovedRef = useRef(false)
 
+  // Pins are anchored to the rendered image rectangle so they never move relative to the map
+  // when the container resizes (sidebar/scrollbar/layout changes).
+  const [contSize, setContSize] = useState({ w: 0, h: 0 })
+  const [natSize, setNatSize] = useState({ w: 0, h: 0 })
+
+  useEffect(() => {
+    const el = mapRef.current
+    if (!el) return
+    const update = () => setContSize({ w: el.clientWidth, h: el.clientHeight })
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [mapImageUrl])
+
+  useEffect(() => {
+    const img = imgRef.current
+    if (img && img.complete && img.naturalWidth) setNatSize({ w: img.naturalWidth, h: img.naturalHeight })
+  }, [mapImageUrl])
+
+  function imgRect() {
+    const { w: cw, h: ch } = contSize
+    const { w: nw, h: nh } = natSize
+    if (!cw || !ch || !nw || !nh) return null
+    const scale = Math.min(cw / nw, ch / nh)
+    const dw = nw * scale, dh = nh * scale
+    return { dw, dh, ox: (cw - dw) / 2, oy: (ch - dh) / 2 }
+  }
+
   useEffect(() => { if (token) loadData() }, [token])
 
   async function loadData() {
@@ -118,19 +147,23 @@ export default function PlayerMap() {
               {/* Pan/zoom transform layer — image + pins move/scale together */}
               <div ref={wrapRef} style={{ position: 'absolute', inset: 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'center center', transition: panningRef.current ? 'none' : 'transform 0.08s ease-out' }}>
                 {mapImageUrl
-                  ? <img ref={imgRef} src={mapImageUrl} alt="World Map" style={s.mapImg} draggable={false} />
+                  ? <img ref={imgRef} src={mapImageUrl} alt="World Map" style={s.mapImg} draggable={false}
+                      onLoad={e => setNatSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })} />
                   : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#5a4a30', fontStyle: 'italic' }}>No map available yet.</div>
                 }
 
                 {locations.map(loc => {
                   const revealed = isRevealed(loc.id)
                   const isSelected = selectedPin?.id === loc.id
+                  const rect = imgRect()
+                  const left = rect ? `${rect.ox + (loc.x_percent / 100) * rect.dw}px` : `${loc.x_percent}%`
+                  const top = rect ? `${rect.oy + (loc.y_percent / 100) * rect.dh}px` : `${loc.y_percent}%`
                   return (
                     <div key={loc.id}
                       style={{
                         ...s.pin,
-                        left: `${loc.x_percent}%`,
-                        top: `${loc.y_percent}%`,
+                        left,
+                        top,
                         transform: `translate(-50%, -100%) scale(${loc.pin_scale ?? 1}) rotate(${loc.pin_rotation ?? 0}deg)`,
                         ...(isSelected ? s.pinSelected : {})
                       }}
@@ -271,7 +304,7 @@ const s: Record<string, React.CSSProperties> = {
   zoomLabel: { fontSize: 10, color: '#9a8a70', minWidth: 30, textAlign: 'center', letterSpacing: '0.05em' },
   mapContainer: { width: '100%', height: '100%', position: 'relative', overflow: 'hidden' },
   mapImg: { width: '100%', height: '100%', objectFit: 'contain', display: 'block', userSelect: 'none' },
-   pin: { position: 'absolute', transform: 'translate(-50%, -100%)', transformOrigin: 'bottom center', cursor: 'pointer', zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center' },
+  pin: { position: 'absolute', transform: 'translate(-50%, -100%)', transformOrigin: 'bottom center', cursor: 'pointer', zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center' },
   pinSelected: { zIndex: 6 },
   pinDot: { width: 12, height: 12, borderRadius: '50%', border: '2px solid' },
   pinLabel: { background: 'rgba(13,10,7,0.85)', border: '1px solid', borderRadius: 4, padding: '2px 6px', fontSize: 11, whiteSpace: 'nowrap', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 },
