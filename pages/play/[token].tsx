@@ -269,6 +269,27 @@ export default function PlayerPortal() {
                         <div style={{ height: '100%', background: '#c9933a', borderRadius: 3, width: `${progressPct}%`, transition: 'width 0.5s ease' }} />
                       </div>
                       <p style={{ fontSize: 12, color: '#7a6a50', fontStyle: 'italic' }}>{renownLevel.description}</p>
+                                          </div>
+                    <div style={{ borderTop: '1px solid rgba(201,147,58,0.15)', paddingTop: 14, marginBottom: 14 }}>
+                      <div style={s.cardTitle}>🏆 Renown Levels</div>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                        <thead>
+                          <tr style={{ textAlign: 'left', color: '#7a6a50' }}>
+                            <th style={{ padding: '5px 6px' }}>Level</th>
+                            <th style={{ padding: '5px 6px' }}>Used to reach</th>
+                            <th style={{ padding: '5px 6px' }}>Description</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {RENOWN_LEVELS.map(l => (
+                            <tr key={l.level} style={{ borderTop: '1px solid rgba(201,147,58,0.12)', ...(l.level === renownLevel.level ? { background: 'rgba(201,147,58,0.12)' } : {}) }}>
+                              <td style={{ padding: '5px 6px', color: '#e8b86d', fontWeight: 600, whiteSpace: 'nowrap' }}>{l.level}</td>
+                              <td style={{ padding: '5px 6px', color: '#c9933a' }}>{l.points}</td>
+                              <td style={{ padding: '5px 6px', color: '#b8a888' }}>{l.description}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
 
                     <div style={{ borderTop: '1px solid rgba(201,147,58,0.15)', paddingTop: 14 }}>
