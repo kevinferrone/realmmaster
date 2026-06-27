@@ -320,34 +320,7 @@ export default function PlayerPortal() {
                       </table>
                     </div>
                   </div>
-
-                    <div style={{ borderTop: '1px solid rgba(201,147,58,0.15)', paddingTop: 14 }}>
-                      <div style={s.cardTitle}>Spend Renown Points</div>
-                      <p style={{ fontSize: 12, color: '#7a6a50', fontStyle: 'italic', marginBottom: 10 }}>
-                        Spend points to gain renown levels and unlock benefits granted by your DM.
-                      </p>
-                      <input style={s.input} type="number" value={spendPoints} onChange={e => setSpendPoints(e.target.value)} placeholder="Points to spend" />
-                      <input style={s.input} value={spendReason} onChange={e => setSpendReason(e.target.value)} placeholder="What are you spending them on?" />
-                      <button style={s.btnPrimary} onClick={spendRenown} disabled={spending || !renown?.available}>
-                        {spending ? 'Spending...' : 'Spend Renown'}
-                      </button>
-                      {spendMsg && <p style={{ fontSize: 13, color: spendMsg.startsWith('✓') ? '#5aaa5a' : '#c04040', marginTop: 8 }}>{spendMsg}</p>}
-                    </div>
-
-                    {renown?.transactions?.length > 0 && (
-                      <div style={{ borderTop: '1px solid rgba(201,147,58,0.15)', paddingTop: 14, marginTop: 14 }}>
-                        <div style={s.cardTitle}>Recent Transactions</div>
-                        {renown.transactions.slice(0, 5).map((t: any) => (
-                          <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(201,147,58,0.08)', fontSize: 12 }}>
-                            <span style={{ color: t.type === 'earned' ? '#5aaa5a' : '#c9933a' }}>
-                              {t.type === 'earned' ? '+' : '-'}{t.points} — {t.reason}
-                            </span>
-                            <span style={{ color: '#5a4a30' }}>{new Date(t.created_at).toLocaleDateString()}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  
                 </div>
               </div>
             </div>
