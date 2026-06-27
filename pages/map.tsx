@@ -65,6 +65,35 @@ export default function MapPage() {
 
   useEffect(() => { if (session) loadWorlds() }, [session])
   useEffect(() => { if (worldId) { loadMap(); if (isDM) { loadPlayers(); loadParties() } } }, [worldId])
+  
+  const [mapScale, setMapScale] = useState('')
+  const [mapDescription, setMapDescription] = useState('')
+  const [analyzingMap, setAnalyzingMap] = useState(false)
+  const [mapGuideMsg, setMapGuideMsg] = useState('')
+
+  useEffect(() => {
+    const w = worlds.find((x: any) => x.id === worldId)
+    setMapScale(w?.map_scale || '')
+    setMapDescription(w?.map_description || '')
+  }, [worldId, worlds])
+
+  async function analyzeMap() {
+    if (!worldId) return
+    setAnalyzingMap(true); setMapGuideMsg('')
+    try {
+      const r = await fetch('/api/dm/analyze-map', { method: 'POST', headers: authH, body: JSON.stringify({ worldId, mapScale }) })
+      const d = await r.json()
+      if (!r.ok) setMapGuideMsg('Error: ' + (d.error || 'failed'))
+      else { setMapDescription(d.mapDescription || ''); setMapGuideMsg('✓ Map analyzed — review the guide below, then Save.') }
+    } catch (e: any) { setMapGuideMsg('Error: ' + e.message) }
+    setAnalyzingMap(false)
+  }
+
+  async function saveMapGuide() {
+    if (!worldId) return
+    const r = await fetch('/api/dm/worlds', { method: 'PATCH', headers: authH, body: JSON.stringify({ worldId, mapScale, mapDescription }) })
+    setMapGuideMsg(r.ok ? '✓ Saved.' : 'Save failed.')
+  }
 
   async function loadWorlds() {
     const r = await fetch('/api/dm/worlds', { headers: authH })
@@ -312,6 +341,20 @@ export default function MapPage() {
             <button style={s.btnSm} onClick={() => getSupabaseBrowser().auth.signOut()}>Sign Out</button>
           </div>
         </nav>
+        
+        {isDM && mapImageUrl && (
+          <div style={{ ...s.card, margin: '12px 16px' }}>
+            <div style={s.panelTitle}>🧭 Map Analysis</div>
+            <label style={{ fontSize: 11, color: '#7a6a50' }}>Map scale — e.g. "≈50 miles per inch" or "the continent is ~800 miles across"</label>
+            <input style={s.select} value={mapScale} onChange={e => setMapScale(e.target.value)} placeholder="Describe the map's scale…" />
+            <div style={{ display: 'flex', gap: 8, margin: '8px 0' }}>
+              <button style={s.btnSm} onClick={analyzeMap} disabled={analyzingMap}>{analyzingMap ? 'Reading the map…' : '🔍 Analyze Map'}</button>
+              <button style={s.btnSm} onClick={saveMapGuide} disabled={analyzingMap}>💾 Save Guide</button>
+            </div>
+            <textarea style={{ ...s.select, height: 180, fontFamily: 'inherit' }} value={mapDescription} onChange={e => setMapDescription(e.target.value)} placeholder="Click Analyze Map — the AI reads your map image and writes a guide of locations, positions, and roads here. Review/edit it, then Save." />
+            {mapGuideMsg && <p style={{ fontSize: 12, color: mapGuideMsg.startsWith('✓') ? '#5aaa5a' : '#c04040', margin: '4px 0 0' }}>{mapGuideMsg}</p>}
+          </div>
+        )}
 
         <div style={s.layout}>
           {/* MAP */}
