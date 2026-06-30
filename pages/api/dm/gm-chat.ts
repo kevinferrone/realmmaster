@@ -11,7 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!user) return res.status(401).json({ error: 'Unauthorized' })
   if (req.method !== 'POST') return res.status(405).end()
 
-  const { worldId, message, history } = req.body
+  const { worldId, message, history, focusType, focusId } = req.body
   if (!worldId || !message) return res.status(400).json({ error: 'worldId and message required' })
 
   const db = getSupabaseAdmin()
@@ -20,6 +20,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .eq('id', worldId).eq('dm_id', user.id).single()
   if (!world) return res.status(403).json({ error: 'Forbidden' })
 
+  // Optional focus: scope campaign knowledge to a single character or a whole party.
+  let focusLabel = ''
+  let focusPlayerIds: string[] | null = null
+  if (focusType === 'player' && focusId) {
+    const { data: p } = await db
+      .from('players').select('character_name, name')
+      .eq('id', focusId).eq('world_id', worldId).single()
+    if (p) { focusLabel = p.character_name || p.name; focusPlayerIds = [focusId] }
+  } else if (focusType === 'party' && focusId) {
+    const { data: party } = await db
+      .from('parties').select('name').eq('id', focusId).eq('world_id', worldId).single()
+    const { data: mem } = await db
+      .from('party_members').select('player_id').eq('party_id', focusId)
+    if (party) { focusLabel = party.name; focusPlayerIds = (mem || []).map((m: any) => m.player_id) }
+  }
+
   const { data: players } = await db
     .from('players').select('character_name, name, character_class, character_background')
     .eq('world_id', worldId)
@@ -27,9 +43,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     `- ${p.character_name || p.name}${p.character_class ? ` (${p.character_class})` : ''}${p.character_background ? ` — ${String(p.character_background).slice(0, 200)}` : ''}`
   ).join('\n')
 
-  const { data: knowledge } = await db
+  let kq = db
     .from('character_knowledge').select('category, title, content')
     .eq('world_id', worldId).eq('is_active', true)
+  if (focusPlayerIds) kq = kq.in('player_id', focusPlayerIds)
+  const { data: knowledge } = await kq
   const seen = new Set<string>()
   const byCat: Record<string, string[]> = {}
   for (const k of (knowledge || [])) {
@@ -54,7 +72,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const canon = (world.canon_text || '').slice(0, 60000)
 
-  const systemPrompt = `You are the Game Master's creative assistant and campaign oracle for the world "${world.name}". You sit behind the GM screen and have full, unrestricted knowledge of the campaign.
+  const focusNote = focusLabel
+    ? `\nCURRENT FOCUS: ${focusLabel}. The GM has scoped this conversation to ${focusLabel}. The CAMPAIGN KNOWLEDGE below is limited to what ${focusLabel} knows. Center your answers, encounters, hooks, and items on ${focusLabel}; use WORLD CANON and SESSION RECAPS for grounding, but don't assume ${focusLabel} knows things outside their knowledge below or general world canon.\n`
+    : ''
+  const knowledgeHeading = focusLabel
+    ? `CAMPAIGN KNOWLEDGE (everything ${focusLabel} has learned so far)`
+    : 'CAMPAIGN KNOWLEDGE (everything the party has learned so far)'
+
+  const systemPrompt = `You are the Game Master's creative assistant and campaign oracle for the world "${world.name}". You sit behind the GM screen and have full, unrestricted knowledge of the campaign.${focusNote}
 
 WHAT YOU DO:
 - Answer questions about campaign history, NPCs, places, items, and events — accurately, from the data below.
@@ -73,7 +98,7 @@ ${world.description || ''}
 CHARACTERS:
 ${roster || 'No characters yet.'}
 
-CAMPAIGN KNOWLEDGE (everything the party has learned so far):
+${knowledgeHeading}:
 ${knowledgeBlock}
 
 SESSION RECAPS:
