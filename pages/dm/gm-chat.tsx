@@ -7,6 +7,9 @@ export default function GMChatPage() {
   const [loading, setLoading] = useState(true)
   const [worlds, setWorlds] = useState<any[]>([])
   const [worldId, setWorldId] = useState('')
+  const [players, setPlayers] = useState<any[]>([])
+  const [parties, setParties] = useState<any[]>([])
+  const [focus, setFocus] = useState('world')   // 'world' | `party:<id>` | `player:<id>`
   const [messages, setMessages] = useState<any[]>([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -30,6 +33,13 @@ export default function GMChatPage() {
       .catch(() => {})
   }, [token])
 
+  // Load the chosen world's characters and parties so the GM can focus on one.
+  useEffect(() => {
+    if (!token || !worldId) { setPlayers([]); setParties([]); return }
+    fetch(`/api/dm/players?worldId=${worldId}`, { headers: authH }).then(r => r.json()).then(d => setPlayers(d.players || [])).catch(() => {})
+    fetch(`/api/dm/parties?worldId=${worldId}`, { headers: authH }).then(r => r.json()).then(d => setParties(d.parties || [])).catch(() => {})
+  }, [token, worldId])
+
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, busy])
 
   async function send() {
@@ -38,9 +48,10 @@ export default function GMChatPage() {
     const next = [...messages, userMsg]
     setMessages(next); setInput(''); setBusy(true)
     try {
+      const [focusType, focusId] = focus === 'world' ? ['world', ''] : focus.split(':')
       const r = await fetch('/api/dm/gm-chat', {
         method: 'POST', headers: authH,
-        body: JSON.stringify({ worldId, message: userMsg.content, history: messages.slice(-10) })
+        body: JSON.stringify({ worldId, message: userMsg.content, history: messages.slice(-10), focusType, focusId })
       })
       const d = await r.json()
       setMessages([...next, { role: 'assistant', content: r.ok ? d.reply : ('Error: ' + (d.error || 'failed')) }])
@@ -66,10 +77,26 @@ export default function GMChatPage() {
       <div style={s.logo}>⚔ Realm<span style={{ color: '#c04040' }}>Master</span> · GM Assistant</div>
       <p style={s.sub}>Ask anything about your campaign, or have it build encounters, NPCs, items, and handouts — grounded in everything your party has done.</p>
 
-      <select style={s.input} value={worldId} onChange={e => { setWorldId(e.target.value); setMessages([]) }}>
+      <select style={s.input} value={worldId} onChange={e => { setWorldId(e.target.value); setFocus('world'); setMessages([]) }}>
         <option value="">Select a world…</option>
         {worlds.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
       </select>
+
+      {worldId && (
+        <select style={s.input} value={focus} onChange={e => { setFocus(e.target.value); setMessages([]) }}>
+          <option value="world">🌍 Whole world — full campaign</option>
+          {parties.length > 0 && (
+            <optgroup label="Focus on a party">
+              {parties.map(p => <option key={p.id} value={`party:${p.id}`}>🛡 {p.name}</option>)}
+            </optgroup>
+          )}
+          {players.length > 0 && (
+            <optgroup label="Focus on a character">
+              {players.map(p => <option key={p.id} value={`player:${p.id}`}>{p.character_name || p.name}</option>)}
+            </optgroup>
+          )}
+        </select>
+      )}
 
       {messages.length === 0 && (
         <div style={s.hints}>
