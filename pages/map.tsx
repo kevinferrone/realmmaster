@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Head from 'next/head'
 import { getSupabaseBrowser } from '../lib/supabase'
 
@@ -101,6 +101,12 @@ export default function MapPage() {
     const img = imgRef.current
     if (img && img.complete && img.naturalWidth) setNatSize({ w: img.naturalWidth, h: img.naturalHeight })
   }, [mapImageUrl])
+
+  // Capture the image's natural size even when it's served from cache (onLoad may not fire then).
+  const captureImg = useCallback((el: HTMLImageElement | null) => {
+    imgRef.current = el
+    if (el && el.complete && el.naturalWidth) setNatSize({ w: el.naturalWidth, h: el.naturalHeight })
+  }, [])
 
   // The displayed image rect within the container, given objectFit: contain.
   function imgRect() {
@@ -481,7 +487,7 @@ export default function MapPage() {
               {/* Pan/zoom transform layer — image + pins move/scale together */}
               <div ref={wrapRef} style={{ position: 'absolute', inset: 0, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'center center', transition: panningRef.current ? 'none' : 'transform 0.08s ease-out' }}>
                 {mapImageUrl
-                  ? <img ref={imgRef} src={mapImageUrl} alt="World Map" style={s.mapImg} draggable={false}
+                  ? <img key={mapImageUrl} ref={captureImg} src={mapImageUrl} alt="World Map" style={s.mapImg} draggable={false}
                       onLoad={e => setNatSize({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })} />
                   : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#5a4a30', fontStyle: 'italic' }}>No map image set. Add a map URL in the World tab.</div>
                 }
